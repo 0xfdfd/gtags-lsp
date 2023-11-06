@@ -5,6 +5,7 @@
 #include "utils/lsp_msg.h"
 #include "utils/io.h"
 #include "utils/log.h"
+#include "utils/lsp_work.h"
 #include "runtime.h"
 
 #if defined(WIN32)
@@ -57,6 +58,7 @@ static void _at_exit_stage_1(void)
     tag_lsp_msg_exit();
     tag_lsp_io_exit();
     tag_lsp_log_exit();
+    lsp_work_exit();
 }
 
 static void _at_exit_stage_2(void)
@@ -67,7 +69,6 @@ static void _at_exit_stage_2(void)
         g_tags.parser = NULL;
     }
 
-    uv_mutex_destroy(&g_tags.work_queue_mutex);
     tag_lsp_cleanup_workspace_folders();
     tag_lsp_cleanup_client_capabilities();
 }
@@ -190,11 +191,9 @@ static char** _initialize(int argc, char* argv[])
 
     _setup_io_or_help(argv);
 
-    ev_list_init(&g_tags.work_queue);
-    uv_mutex_init(&g_tags.work_queue_mutex);
-
     tag_lsp_msg_init();
     tag_lsp_log_init();
+    lsp_work_init();
 
     g_tags.parser = lsp_parser_create(_handle_request);
 

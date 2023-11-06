@@ -46,18 +46,6 @@ typedef struct workspace_folder
     char*                       uri;
 } workspace_folder_t;
 
-typedef struct tag_lsp_work
-{
-    ev_list_node_t              node;                   /**< List node for #tags_ctx_t::work_queue */
-    uv_work_t                   token;                  /**< Work token. */
-
-    cJSON*                      req;                    /**< LSP request. */
-    cJSON*                      rsp;                    /**< LSP response. `NULL` if #tag_lsp_work_t::notify is true. */
-
-    int                         notify;                 /**< (Boolean) request is a notification. */
-    int                         cancel;                 /**< (Boolean) request can be cancel. */
-} tag_lsp_work_t;
-
 typedef struct tags_ctx_s
 {
     uv_loop_t*                  loop;                   /**< Event loop. */
@@ -77,9 +65,6 @@ typedef struct tags_ctx_s
          */
         int                     shutdown;
     } flags;
-
-    ev_list_t                   work_queue;             /**< #tag_lsp_work_t */
-    uv_mutex_t                  work_queue_mutex;       /**< Mutex for #tags_ctx_t::work_queue */
 } tags_ctx_t;
 
 extern tags_ctx_t               g_tags;                 /**< Global runtime. */

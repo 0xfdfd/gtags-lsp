@@ -2,6 +2,7 @@
 #define __TAGS_LSP_UTILS_MSG_H__
 
 #include <cjson/cJSON.h>
+#include "utils/lsp_work.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -13,6 +14,17 @@ typedef enum lsp_msg_type_e
     LSP_MSG_RSP,    /**< Response message. */
     LSP_MSG_NFY,    /**< Notification message. */
 } lsp_msg_type_t;
+
+typedef struct tag_lsp_work_method
+{
+    lsp_work_t                  token;                  /**< Work token. */
+
+    cJSON*                      req;                    /**< LSP request. */
+    cJSON*                      rsp;                    /**< LSP response. `NULL` if #tag_lsp_work_t::notify is true. */
+
+    int                         notify;                 /**< (Boolean) request is a notification. */
+    int                         cancel;                 /**< (Boolean) request can be cancel. */
+} tag_lsp_work_method_t;
 
 int tag_lsp_msg_init(void);
 void tag_lsp_msg_exit(void);

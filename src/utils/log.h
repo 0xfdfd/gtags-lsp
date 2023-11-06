@@ -1,5 +1,5 @@
-#ifndef __TAG_LSP_UTILS_LOG_H__
-#define __TAG_LSP_UTILS_LOG_H__
+#ifndef __TAGS_LSP_UTILS_LOG_H__
+#define __TAGS_LSP_UTILS_LOG_H__
 
 /**
  * @brief Log message to log file and post `window/logMessage` if support.

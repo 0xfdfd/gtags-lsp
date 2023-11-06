@@ -1,25 +1,32 @@
 #include "__init__.h"
 #include "runtime.h"
+#include "utils/lsp_work.h"
+#include "utils/lsp_msg.h"
 
-static void _lsp_method_cancelrequest_nolock(cJSON* j_id)
+static int _lsp_method_on_foreach(lsp_work_t* work, void* arg)
 {
-    ev_list_node_t* it = ev_list_begin(&g_tags.work_queue);
+    cJSON* j_id = arg;
 
-    for (; it != NULL; it = ev_list_next(it))
+    if (work->type != LSP_WORK_METHOD)
     {
-        tag_lsp_work_t* work = container_of(it, tag_lsp_work_t, node);
-        cJSON* orig_id = cJSON_GetObjectItem(work->req, "id");
-
-        if (cJSON_Compare(orig_id, j_id, 1))
-        {
-            /* Set cancel flag so processing request can try best to cancel. */
-            work->cancel = 1;
-
-            /* Pending request is revoked. */
-            uv_cancel((uv_req_t*)&work->token);
-            break;
-        }
+        return 0;
     }
+
+    tag_lsp_work_method_t* method_work = container_of(work, tag_lsp_work_method_t, token);
+    cJSON* orig_id = cJSON_GetObjectItem(method_work->req, "id");
+
+    if (cJSON_Compare(j_id, orig_id, 1))
+    {
+        /* Set cancel flag so processing request can try best to cancel. */
+        method_work->cancel = 1;
+
+        /* Pending request is revoked. */
+        lsp_work_cancel(work);
+
+        return 1;
+    }
+
+    return 0;
 }
 
 static int _lsp_method_cancelrequest(cJSON* req, cJSON* rsp)
@@ -29,9 +36,7 @@ static int _lsp_method_cancelrequest(cJSON* req, cJSON* rsp)
     cJSON* j_params = cJSON_GetObjectItem(req, "params");
     cJSON* j_id = cJSON_GetObjectItem(j_params, "id");
 
-    uv_mutex_lock(&g_tags.work_queue_mutex);
-    _lsp_method_cancelrequest_nolock(j_id);
-    uv_mutex_unlock(&g_tags.work_queue_mutex);
+    lsp_work_foreach(_lsp_method_on_foreach, j_id);
 
     return 0;
 }

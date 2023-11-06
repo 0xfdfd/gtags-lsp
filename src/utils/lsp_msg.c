@@ -274,10 +274,10 @@ int tag_lsp_send_error(cJSON* req, int code)
     return 0;
 }
 
-static void _lsp_method_on_work(uv_work_t* req)
+static void _lsp_method_on_work(lsp_work_t* req)
 {
     int ret = 0;
-    tag_lsp_work_t* work = container_of(req, tag_lsp_work_t, token);
+    tag_lsp_work_method_t* work = container_of(req, tag_lsp_work_method_t, token);
 
     /* Check whether it is a notify. */
     if (!work->notify)
@@ -305,9 +305,9 @@ static void _lsp_method_on_work(uv_work_t* req)
     }
 }
 
-static void _lsp_method_after_work(uv_work_t* req, int status)
+static void _lsp_method_after_work(lsp_work_t* req, int status)
 {
-    tag_lsp_work_t* work = container_of(req, tag_lsp_work_t, token);
+    tag_lsp_work_method_t* work = container_of(req, tag_lsp_work_method_t, token);
 
     if (!work->notify)
     {
@@ -320,11 +320,6 @@ static void _lsp_method_after_work(uv_work_t* req, int status)
             tag_lsp_send_rsp(work->rsp);
         }
     }
-
-    /* Remove record. */
-    uv_mutex_lock(&g_tags.work_queue_mutex);
-    ev_list_erase(&g_tags.work_queue, &work->node);
-    uv_mutex_unlock(&g_tags.work_queue_mutex);
 
     if (work->req != NULL)
     {
@@ -341,7 +336,7 @@ static void _lsp_method_after_work(uv_work_t* req, int status)
 
 void tag_lsp_handle_req(cJSON* req, int is_notify)
 {
-    tag_lsp_work_t* work = malloc(sizeof(tag_lsp_work_t));
+    tag_lsp_work_method_t* work = malloc(sizeof(tag_lsp_work_method_t));
     if (work == NULL)
     {
         abort();
@@ -352,15 +347,7 @@ void tag_lsp_handle_req(cJSON* req, int is_notify)
     work->notify = is_notify;
     work->cancel = 0;
 
-    uv_mutex_lock(&g_tags.work_queue_mutex);
-    ev_list_push_back(&g_tags.work_queue, &work->node);
-    uv_mutex_unlock(&g_tags.work_queue_mutex);
-
-    int ret = uv_queue_work(g_tags.loop, &work->token, _lsp_method_on_work, _lsp_method_after_work);
-    if (ret != 0)
-    {
-        abort();
-    }
+    lsp_queue_work(&work->token, LSP_WORK_METHOD, _lsp_method_on_work, _lsp_method_after_work);
 }
 
 void tag_lsp_handle_rsp(cJSON* rsp)

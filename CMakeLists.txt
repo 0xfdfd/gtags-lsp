@@ -37,6 +37,7 @@ add_executable(${PROJECT_NAME}
     "src/utils/lsp_error.c"
     "src/utils/lsp_msg.c"
     "src/utils/lsp_parser.c"
+    "src/utils/lsp_work.c"
     "src/main.c"
     "src/runtime.c"
     "src/version.c")

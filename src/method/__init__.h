@@ -2,7 +2,6 @@
 #define __TAGS_LSP_METHOD_INIT_H__
 
 #include <cjson/cJSON.h>
-#include "utils/lsp_msg.h"
 
 #ifdef __cplusplus
 extern "C" {

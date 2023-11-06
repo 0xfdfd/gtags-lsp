@@ -3,6 +3,7 @@
 #include "runtime.h"
 #include "utils/lsp_error.h"
 #include "utils/lsp_msg.h"
+#include "utils/lsp_work.h"
 
 typedef struct lsp_shutdown_ctx
 {
@@ -17,9 +18,9 @@ static void _lsp_shutdown_thread(void* arg)
     (void)arg;
 
     /* Waiting for all task complete. */
-    while (ev_list_size(&g_tags.work_queue) != 0)
+    while (lsp_work_queue_size() != 0)
     {
-        uv_sleep(10);
+        uv_sleep(100);
     }
 
     /* Set response. */
