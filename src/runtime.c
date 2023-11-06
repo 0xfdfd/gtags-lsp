@@ -75,7 +75,7 @@ static void _on_tty_stdout(uv_write_t* req, int status)
 {
     if (status != 0)
     {
-        uv_stop(&g_tags.loop);
+        uv_stop(g_tags.loop);
         return;
     }
 
@@ -106,7 +106,7 @@ int tag_lsp_send_msg(cJSON* msg)
         "Content-Type:application/vscode-jsonrpc; charset=utf-8\r\n\r\n",
         stdout_req->bufs[1].len);
 
-    ret = uv_write(&stdout_req->req, (uv_stream_t*)&g_tags.tty_stdout, stdout_req->bufs, 2, _on_tty_stdout);
+    ret = tag_lsp_io_write(&stdout_req->req, stdout_req->bufs, 2, _on_tty_stdout);
     if (ret != 0)
     {
         _runtime_release_send_buf(stdout_req);

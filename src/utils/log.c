@@ -3,14 +3,33 @@
 #include <stdio.h>
 #include "runtime.h"
 
+typedef struct tag_lsp_log_s
+{
+    ev_list_node_t              node;                   /**< List node for #tags_ctx_t::log_queue */
+    lsp_trace_message_type_t    type;                   /**< Message type. */
+    const char*                 file;                   /**< File name. */
+    const char*                 func;                   /**< Function name. */
+    int                         line;                   /**< Line number. */
+    char*                       message;                /**< The actual message. */
+} tag_lsp_log_t;
+
+typedef struct tag_lsp_log_ctx
+{
+    ev_list_t                   log_queue;              /**< log queue. */
+    uv_mutex_t                  log_queue_mutex;        /**< Mutex for #tags_ctx_t::log_queue */
+    uv_async_t                  log_queue_notifier;     /**< Notifier for #tags_ctx_t::log_queue. */
+} tag_lsp_log_ctx_t;
+
+static tag_lsp_log_ctx_t* s_log_ctx = NULL;
+
 static tag_lsp_log_t* _pop_log_from_queue(void)
 {
     ev_list_node_t* node;
-    uv_mutex_lock(&g_tags.log_ctx.log_queue_mutex);
+    uv_mutex_lock(&s_log_ctx->log_queue_mutex);
     {
-        node = ev_list_pop_front(&g_tags.log_ctx.log_queue);
+        node = ev_list_pop_front(&s_log_ctx->log_queue);
     }
-    uv_mutex_unlock(&g_tags.log_ctx.log_queue_mutex);
+    uv_mutex_unlock(&s_log_ctx->log_queue_mutex);
 
     if (node == NULL)
     {
@@ -118,25 +137,41 @@ static void _on_log_queue(uv_async_t* handle)
 
 void tag_lsp_log_init(void)
 {
-    ev_list_init(&g_tags.log_ctx.log_queue);
-    uv_mutex_init(&g_tags.log_ctx.log_queue_mutex);
-    uv_async_init(&g_tags.loop, &g_tags.log_ctx.log_queue_notifier, _on_log_queue);
+    if ((s_log_ctx = malloc(sizeof(tag_lsp_log_ctx_t))) == NULL)
+    {
+        fprintf(stderr, "out of memory.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    ev_list_init(&s_log_ctx->log_queue);
+    uv_mutex_init(&s_log_ctx->log_queue_mutex);
+    uv_async_init(g_tags.loop, &s_log_ctx->log_queue_notifier, _on_log_queue);
 }
 
-void tag_lsp_log_exit_1(void)
+static void _tag_lsp_on_log_exit(uv_handle_t* handle)
 {
-    uv_close((uv_handle_t*)&g_tags.log_ctx.log_queue_notifier, NULL);
-}
+    (void)handle;
 
-void tag_lsp_log_exit_2(void)
-{
     tag_lsp_log_t* log;
     while ((log = _pop_log_from_queue()) != NULL)
     {
         free(log);
     }
 
-    uv_mutex_destroy(&g_tags.log_ctx.log_queue_mutex);
+    uv_mutex_destroy(&s_log_ctx->log_queue_mutex);
+
+    free(s_log_ctx);
+    s_log_ctx = NULL;
+}
+
+void tag_lsp_log_exit(void)
+{
+    if (s_log_ctx == NULL)
+    {
+        return;
+    }
+
+    uv_close((uv_handle_t*)&s_log_ctx->log_queue_notifier, _tag_lsp_on_log_exit);
 }
 
 void tag_lsp_log(lsp_trace_message_type_t type, const char* file, const char* func,
@@ -169,11 +204,11 @@ void tag_lsp_log(lsp_trace_message_type_t type, const char* file, const char* fu
     vsnprintf(msg->message, msg_len + 1, fmt, ap_bak);
     va_end(ap_bak);
 
-    uv_mutex_lock(&g_tags.log_ctx.log_queue_mutex);
+    uv_mutex_lock(&s_log_ctx->log_queue_mutex);
     {
-        ev_list_push_back(&g_tags.log_ctx.log_queue, &msg->node);
+        ev_list_push_back(&s_log_ctx->log_queue, &msg->node);
     }
-    uv_mutex_unlock(&g_tags.log_ctx.log_queue_mutex);
+    uv_mutex_unlock(&s_log_ctx->log_queue_mutex);
 
-    uv_async_send(&g_tags.log_ctx.log_queue_notifier);
+    uv_async_send(&s_log_ctx->log_queue_notifier);
 }

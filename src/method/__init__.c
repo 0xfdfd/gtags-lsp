@@ -131,7 +131,7 @@ int lsp_method_call(cJSON* req)
     ev_list_push_back(&g_tags.work_queue, &work->node);
     uv_mutex_unlock(&g_tags.work_queue_mutex);
 
-    int ret = uv_queue_work(&g_tags.loop, &work->token, _lsp_method_on_work, _lsp_method_after_work);
+    int ret = uv_queue_work(g_tags.loop, &work->token, _lsp_method_on_work, _lsp_method_after_work);
     if (ret != 0)
     {
         abort();

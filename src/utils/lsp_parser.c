@@ -61,7 +61,7 @@ static int _lsp_parser_on_message_complete(llhttp_t* parser)
     return HPE_PAUSED;
 }
 
-int lsp_parser_init(lsp_parser_t* parser, lsp_parser_cb cb)
+static int _lsp_parser_init(lsp_parser_t* parser, lsp_parser_cb cb)
 {
     llhttp_settings_init(&parser->settings);
 
@@ -80,7 +80,19 @@ int lsp_parser_init(lsp_parser_t* parser, lsp_parser_cb cb)
     return 0;
 }
 
-void lsp_parser_exit(lsp_parser_t* parser)
+lsp_parser_t* lsp_parser_create(lsp_parser_cb cb)
+{
+    lsp_parser_t* parser = malloc(sizeof(lsp_parser_t));
+    if (parser == NULL)
+    {
+        return NULL;
+    }
+
+    _lsp_parser_init(parser, cb);
+    return parser;
+}
+
+static void _lsp_parser_exit(lsp_parser_t* parser)
 {
     if (parser->cache != NULL)
     {
@@ -88,6 +100,12 @@ void lsp_parser_exit(lsp_parser_t* parser)
         parser->cache = NULL;
     }
     parser->cache_sz = 0;
+}
+
+void lsp_parser_destroy(lsp_parser_t* parser)
+{
+    _lsp_parser_exit(parser);
+    free(parser);
 }
 
 int lsp_parser_execute(lsp_parser_t* parser, const char* data, size_t size)

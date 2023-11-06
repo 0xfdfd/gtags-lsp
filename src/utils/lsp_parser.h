@@ -22,9 +22,10 @@ struct lsp_parser
     size_t              cache_sz;
 };
 
-int lsp_parser_init(lsp_parser_t* parser, lsp_parser_cb cb);
 
-void lsp_parser_exit(lsp_parser_t* parser);
+lsp_parser_t* lsp_parser_create(lsp_parser_cb cb);
+
+void lsp_parser_destroy(lsp_parser_t* parser);
 
 int lsp_parser_execute(lsp_parser_t* parser, const char* data, size_t size);
 

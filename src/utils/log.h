@@ -23,26 +23,8 @@ typedef enum lsp_trace_message_type
     LSP_MSG_DEBUG    = 5,
 } lsp_trace_message_type_t;
 
-typedef struct tag_lsp_log_s
-{
-    ev_list_node_t              node;                   /**< List node for #tags_ctx_t::log_queue */
-    lsp_trace_message_type_t    type;                   /**< Message type. */
-    const char*                 file;                   /**< File name. */
-    const char*                 func;                   /**< Function name. */
-    int                         line;                   /**< Line number. */
-    char*                       message;                /**< The actual message. */
-} tag_lsp_log_t;
-
-typedef struct tag_lsp_log_ctx
-{
-    ev_list_t                   log_queue;              /**< log queue. */
-    uv_mutex_t                  log_queue_mutex;        /**< Mutex for #tags_ctx_t::log_queue */
-    uv_async_t                  log_queue_notifier;     /**< Notifier for #tags_ctx_t::log_queue. */
-} tag_lsp_log_ctx_t;
-
 void tag_lsp_log_init(void);
-void tag_lsp_log_exit_1(void);
-void tag_lsp_log_exit_2(void);
+void tag_lsp_log_exit(void);
 
 /**
  * @brief Log message to log file and post `window/logMessage` if support.

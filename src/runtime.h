@@ -6,6 +6,7 @@
 #include "utils/list.h"
 #include "utils/lsp_parser.h"
 #include "utils/log.h"
+#include "utils/io.h"
 #include "defines.h"
 
 #ifdef __cplusplus
@@ -39,12 +40,12 @@ typedef struct workspace_folder
      * @brief The name of the workspace folder.
      * Used to refer to this workspace folder in the user interface.
      */
-    char*               name;
+    char*                       name;
 
     /**
      * @brief The associated URI for this workspace folder.
      */
-    char*               uri;
+    char*                       uri;
 } workspace_folder_t;
 
 typedef struct tag_lsp_work
@@ -61,10 +62,8 @@ typedef struct tag_lsp_work
 
 typedef struct tags_ctx_s
 {
-    uv_loop_t                   loop;                   /**< Event loop. */
-    uv_tty_t                    tty_stdin;              /**< Stdin. */
-    uv_tty_t                    tty_stdout;             /**< Stdout. */
-    lsp_parser_t                parser;                 /**< parser for language server protocol. */
+    uv_loop_t*                  loop;                   /**< Event loop. */
+    lsp_parser_t*               parser;                 /**< parser for language server protocol. */
 
     workspace_folder_t*         workspace_folders;      /**< Workspace folders list. */
     size_t                      workspace_folder_sz;    /**< Workspace folders list size. */
@@ -83,8 +82,6 @@ typedef struct tags_ctx_s
 
     ev_list_t                   work_queue;             /**< #tag_lsp_work_t */
     uv_mutex_t                  work_queue_mutex;       /**< Mutex for #tags_ctx_t::work_queue */
-
-    tag_lsp_log_ctx_t           log_ctx;                /**< Log context. */
 } tags_ctx_t;
 
 extern tags_ctx_t               g_tags;                 /**< Global runtime. */
