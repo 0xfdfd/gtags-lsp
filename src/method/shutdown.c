@@ -25,7 +25,7 @@ static void _lsp_shutdown_thread(void* arg)
     /* Set response. */
     cJSON_AddNullToObject(s_shutdown_ctx->rsp, "result");
 
-    tag_lsp_send_msg(s_shutdown_ctx->rsp);
+    tag_lsp_send_rsp(s_shutdown_ctx->rsp);
 
     cJSON_Delete(s_shutdown_ctx->rsp);
     s_shutdown_ctx->rsp = NULL;

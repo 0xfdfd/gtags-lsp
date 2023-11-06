@@ -74,7 +74,7 @@ static void _log_post_lsp_log_message(tag_lsp_log_t* log)
 
     cJSON* msg = tag_lsp_create_notify("window/logMessage", params);
 
-    tag_lsp_send_msg(msg);
+    tag_lsp_send_rsp(msg);
     cJSON_Delete(msg);
 
     free(buf);

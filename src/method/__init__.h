@@ -2,6 +2,7 @@
 #define __TAGS_LSP_METHOD_INIT_H__
 
 #include <cjson/cJSON.h>
+#include "utils/lsp_msg.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -137,12 +138,7 @@ extern lsp_method_t lsp_method_workspace_didchangeworkspacefolders;
  * @}
  */
 
-/**
- * @brief Call lsp method.
- * @param[in] req   JSON-RPC request.
- * @return          Error code.
- */
-int lsp_method_call(cJSON* req);
+int lsp_method_call(cJSON* req, cJSON* rsp, int is_notify);
 
 void lsp_method_cleanup(void);
 

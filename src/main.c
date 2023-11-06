@@ -83,11 +83,20 @@ static void _at_exit(void)
     uv_library_shutdown();
 }
 
-static int _handle_request(lsp_parser_t* parser, cJSON* req)
+static int _handle_request(lsp_parser_t* parser, cJSON* msg)
 {
     (void)parser;
 
-    lsp_method_call(req);
+    lsp_msg_type_t msg_type = lsp_msg_type(msg);
+
+    if (msg_type == LSP_MSG_RSP)
+    {
+        tag_lsp_handle_rsp(msg);
+    }
+    else
+    {
+        tag_lsp_handle_req(msg, msg_type == LSP_MSG_NFY);
+    }
 
     return 0;
 }
