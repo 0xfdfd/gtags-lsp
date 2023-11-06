@@ -1,6 +1,12 @@
+#include <stdlib.h>
 #include "method/__init__.h"
-#include "runtime.h"
 #include "utils/lsp_error.h"
+#include "utils/alloc.h"
+#include "runtime.h"
+
+#if !defined(WIN32)
+#   include <unistd.h>
+#endif
 
 static void _at_exit(void)
 {
@@ -38,6 +44,7 @@ static int _handle_request(lsp_parser_t* parser, cJSON* req)
 static char** _initialize(int argc, char* argv[])
 {
     argv = uv_setup_args(argc, argv);
+    uv_disable_stdio_inheritance();
 
     /* Initialize event loop. */
     if (uv_loop_init(&g_tags.loop) != 0)
@@ -63,13 +70,6 @@ static char** _initialize(int argc, char* argv[])
     return argv;
 }
 
-static void my_alloc_cb(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf)
-{
-    (void)handle;
-    char* addr = malloc(suggested_size);
-    *buf = uv_buf_init(addr, (unsigned int)suggested_size);
-}
-
 static void _on_tty_stdin(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf)
 {
     (void)stream;
@@ -83,7 +83,7 @@ static void _on_tty_stdin(uv_stream_t* stream, ssize_t nread, const uv_buf_t* bu
     lsp_parser_execute(&g_tags.parser, buf->base, nread);
 
 finish:
-    free(buf->base);
+    tag_lsp_free(buf->base);
 }
 
 int main(int argc, char* argv[])
@@ -96,7 +96,7 @@ int main(int argc, char* argv[])
     /* Register global cleanup hook. */
     atexit(_at_exit);
 
-    if (uv_read_start((uv_stream_t*)&g_tags.tty_stdin, my_alloc_cb, _on_tty_stdin) != 0)
+    if (uv_read_start((uv_stream_t*)&g_tags.tty_stdin, tag_lsp_alloc, _on_tty_stdin) != 0)
     {
         abort();
     }

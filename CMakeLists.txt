@@ -30,6 +30,7 @@ add_executable(${PROJECT_NAME}
     "src/method/textdocument_didopen.c"
     "src/method/textdocument_didsave.c"
     "src/method/workspace_didchangeworkspacefolders.c"
+    "src/utils/alloc.c"
     "src/utils/list.c"
     "src/utils/lsp_error.c"
     "src/utils/lsp_parser.c"

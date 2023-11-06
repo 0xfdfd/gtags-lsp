@@ -1,3 +1,5 @@
+#include <string.h>
+#include <stdlib.h>
 #include "runtime.h"
 #include "utils/lsp_error.h"
 

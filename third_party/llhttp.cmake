@@ -6,7 +6,7 @@ set(LLHTTP_INSTALL_PATH ${CMAKE_CURRENT_BINARY_DIR}/third_party/llhttp)
 if (WIN32)
     set(LLHTTP_LIB_PATH ${LLHTTP_INSTALL_PATH}/lib/llhttp.lib)
 else ()
-    set(LLHTTP_LIB_PATH ${LLHTTP_INSTALL_PATH}/lib/llhttp.a)
+    set(LLHTTP_LIB_PATH ${LLHTTP_INSTALL_PATH}/lib/libllhttp.a)
 endif ()
 
 ExternalProject_Add(3rd_llhttp

@@ -1,3 +1,4 @@
+#include <string.h>
 #include "__init__.h"
 #include "runtime.h"
 
