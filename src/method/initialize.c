@@ -3,6 +3,7 @@
 #include "__init__.h"
 #include "runtime.h"
 #include "version.h"
+#include "utils/lsp_msg.h"
 
 #if defined(_WIN32)
 #   define strdup(s)    _strdup(s)
@@ -136,7 +137,7 @@ static void _lsp_method_initialize_finished(cJSON* rsp)
     cJSON_AddItemToObject(rsp, "result", InitializeResult);
 }
 
-static void _lsp_method_initialize(cJSON* req, cJSON* rsp)
+static int _lsp_method_initialize(cJSON* req, cJSON* rsp)
 {
     int ret;
     cJSON* params = cJSON_GetObjectItem(req, "params");
@@ -152,7 +153,7 @@ static void _lsp_method_initialize(cJSON* req, cJSON* rsp)
     }
 
     _lsp_method_initialize_finished(rsp);
-    return;
+    return 0;
 
 error:
     {
@@ -161,9 +162,9 @@ error:
         tag_lsp_set_error(rsp, ret, err_dat);
     }
 
-    return;
+    return 0;
 }
 
 lsp_method_t lsp_method_initialize = {
-    "initialize", _lsp_method_initialize, 0,
+    "initialize", 0, _lsp_method_initialize, NULL,
 };

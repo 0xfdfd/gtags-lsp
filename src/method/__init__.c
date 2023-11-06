@@ -4,6 +4,7 @@
 #include "__init__.h"
 #include "runtime.h"
 #include "utils/lsp_error.h"
+#include "utils/lsp_msg.h"
 
 static lsp_method_t* s_lsp_methods[] = {
     /* Base Protocol. */
@@ -27,6 +28,7 @@ static lsp_method_t* s_lsp_methods[] = {
 
 static void _lsp_method_on_work(uv_work_t* req)
 {
+    int ret = 0;
     tag_lsp_work_t* work = container_of(req, tag_lsp_work_t, token);
 
     /* Check whether it is a notify. */
@@ -62,15 +64,27 @@ static void _lsp_method_on_work(uv_work_t* req)
         {
             if (s_lsp_methods[i]->notify == work->notify)
             {
-                s_lsp_methods[i]->func(work->req, work->rsp);
+                ret = s_lsp_methods[i]->entry(work->req, work->rsp);
+                goto finish;
             }
             else
             {
                 goto error_method_not_found;
             }
-            return;
         }
     }
+    goto error_method_not_found;
+
+finish:
+    if (!work->notify && ret < 0)
+    {
+        tag_lsp_set_error(work->rsp, ret, NULL);
+    }
+    else if (!work->notify && ret == LSP_METHOD_ASYNC)
+    {
+        work->rsp = NULL;
+    }
+    return;
 
 error_method_not_found:
     /* In this case method is not found. */
@@ -78,6 +92,7 @@ error_method_not_found:
     {
         tag_lsp_set_error(work->rsp, TAG_LSP_ERR_METHOD_NOT_FOUND, NULL);
     }
+    return;
 }
 
 static void _lsp_method_after_work(uv_work_t* req, int status)
@@ -138,4 +153,16 @@ int lsp_method_call(cJSON* req)
     }
 
     return 0;
+}
+
+void lsp_method_cleanup(void)
+{
+    size_t i;
+    for (i = 0; i < ARRAY_SIZE(s_lsp_methods); i++)
+    {
+        if (s_lsp_methods[i]->cleanup != NULL)
+        {
+            s_lsp_methods[i]->cleanup();
+        }
+    }
 }

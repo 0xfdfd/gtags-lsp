@@ -1,6 +1,6 @@
 #include "__init__.h"
 
-static void _lsp_method_textdocument_didclose(cJSON* req, cJSON* rsp)
+static int _lsp_method_textdocument_didclose(cJSON* req, cJSON* rsp)
 {
     (void)rsp;
 
@@ -9,8 +9,10 @@ static void _lsp_method_textdocument_didclose(cJSON* req, cJSON* rsp)
     cJSON* j_textDocument = cJSON_GetObjectItem(j_params, "textDocument");
 
     (void)j_textDocument;
+
+    return 0;
 }
 
 lsp_method_t lsp_method_textdocument_didclose = {
-    "textDocument/didClose", _lsp_method_textdocument_didclose, 1,
+    "textDocument/didClose", 1, _lsp_method_textdocument_didclose, NULL,
 };

@@ -1,6 +1,6 @@
 #include "__init__.h"
 
-static void _lsp_method_textdocument_didopen(cJSON* req, cJSON* rsp)
+static int _lsp_method_textdocument_didopen(cJSON* req, cJSON* rsp)
 {
     (void)rsp;
 
@@ -14,8 +14,10 @@ static void _lsp_method_textdocument_didopen(cJSON* req, cJSON* rsp)
     cJSON* j_text = cJSON_GetObjectItem(j_textDocument, "text");
 
     (void)j_uri; (void)j_languageId; (void)j_version; (void)j_text;
+
+    return 0;
 }
 
 lsp_method_t lsp_method_textdocument_didopen = {
-    "textDocument/didOpen", _lsp_method_textdocument_didopen, 1,
+    "textDocument/didOpen", 1, _lsp_method_textdocument_didopen, NULL,
 };

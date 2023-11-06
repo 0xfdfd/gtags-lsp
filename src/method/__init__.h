@@ -7,21 +7,48 @@
 extern "C" {
 #endif
 
+typedef enum lsp_method_ret
+{
+    /**
+     * @brief Method call success.
+     *
+     * For a request, the \p rsp message will send to peer. For a notification,
+     * nothing will happen.
+     */
+    LSP_METHOD_SUCCESS = 0,
+
+    /**
+     * @brief Set this call as async.
+     *
+     * If it is a request, the ownership of \p rsp message transfer to user, you
+     * must send the \p rsp later (e.g. by #tag_lsp_send_msg()) and release it.
+     *
+     * If it is a notification, nothing happen.
+     */
+    LSP_METHOD_ASYNC = 1,
+} lsp_method_ret_t;
+
 /**
  * @brief LSP method callback.
  * @param[in] req   Request message.
  * @param[in] rsp   Response message. If it is a notification, the value is `NULL`.
+ * @return          #lsp_method_ret_t or LSP error code.
+ *
  * @see https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#requestMessage
  * @see https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#responseMessage
  * @see https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#notificationMessage
  */
-typedef void (*lsp_method_fn)(cJSON* req, cJSON* rsp);
+typedef int (*lsp_method_fn)(cJSON* req, cJSON* rsp);
+
+typedef void (*lsp_method_cleanup_fn)(void);
 
 typedef struct lsp_method
 {
-    const char*     name;   /**< Method name. */
-    lsp_method_fn   func;   /**< Method function. */
-    int             notify; /**< This is a notification. It must either 0 or 1. */
+    const char*             name;       /**< Method name. */
+    int                     notify;     /**< This is a notification. It must either 0 or 1. */
+
+    lsp_method_fn           entry;      /**< Method function. */
+    lsp_method_cleanup_fn   cleanup;    /**< Cleanup function. */
 } lsp_method_t;
 
 /**
@@ -116,6 +143,8 @@ extern lsp_method_t lsp_method_workspace_didchangeworkspacefolders;
  * @return          Error code.
  */
 int lsp_method_call(cJSON* req);
+
+void lsp_method_cleanup(void);
 
 #ifdef __cplusplus
 }

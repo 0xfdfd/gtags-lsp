@@ -2,6 +2,9 @@
 #include <string.h>
 #include "method/__init__.h"
 #include "utils/lsp_error.h"
+#include "utils/lsp_msg.h"
+#include "utils/io.h"
+#include "utils/log.h"
 #include "runtime.h"
 
 #if defined(WIN32)
@@ -51,6 +54,7 @@ static void _cleanup_loop(void)
 
 static void _at_exit_stage_1(void)
 {
+    tag_lsp_msg_exit();
     tag_lsp_io_exit();
     tag_lsp_log_exit();
 }
@@ -70,6 +74,8 @@ static void _at_exit_stage_2(void)
 
 static void _at_exit(void)
 {
+    lsp_method_cleanup();
+
     _at_exit_stage_1();
     _cleanup_loop();
     _at_exit_stage_2();
@@ -97,7 +103,7 @@ static void _on_io_in(const char* data, ssize_t size)
     lsp_parser_execute(g_tags.parser, data, size);
 }
 
-static void _setup_arguments(char* argv[])
+static void _setup_io_or_help(char* argv[])
 {
     size_t i;
     int ret = 0;
@@ -173,11 +179,12 @@ static char** _initialize(int argc, char* argv[])
         abort();
     }
 
-    _setup_arguments(argv);
+    _setup_io_or_help(argv);
 
     ev_list_init(&g_tags.work_queue);
     uv_mutex_init(&g_tags.work_queue_mutex);
 
+    tag_lsp_msg_init();
     tag_lsp_log_init();
 
     g_tags.parser = lsp_parser_create(_handle_request);

@@ -22,7 +22,7 @@ static void _lsp_method_cancelrequest_nolock(cJSON* j_id)
     }
 }
 
-static void _lsp_method_cancelrequest(cJSON* req, cJSON* rsp)
+static int _lsp_method_cancelrequest(cJSON* req, cJSON* rsp)
 {
     (void)rsp;
 
@@ -32,8 +32,10 @@ static void _lsp_method_cancelrequest(cJSON* req, cJSON* rsp)
     uv_mutex_lock(&g_tags.work_queue_mutex);
     _lsp_method_cancelrequest_nolock(j_id);
     uv_mutex_unlock(&g_tags.work_queue_mutex);
+
+    return 0;
 }
 
 lsp_method_t lsp_method_cancelrequest = {
-    "$/cancelRequest", _lsp_method_cancelrequest, 1,
+    "$/cancelRequest", 1, _lsp_method_cancelrequest, NULL,
 };

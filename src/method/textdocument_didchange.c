@@ -1,6 +1,6 @@
 #include "__init__.h"
 
-static void _lsp_method_textdocument_didchange(cJSON* req, cJSON* rsp)
+static int _lsp_method_textdocument_didchange(cJSON* req, cJSON* rsp)
 {
     (void)rsp;
 
@@ -12,8 +12,10 @@ static void _lsp_method_textdocument_didchange(cJSON* req, cJSON* rsp)
     cJSON* j_contentChanges = cJSON_GetObjectItem(j_params, "contentChanges");
 
     (void)j_textDocument; (void)j_contentChanges;
+
+    return 0;
 }
 
 lsp_method_t lsp_method_textdocument_didchange = {
-    "textDocument/didChange", _lsp_method_textdocument_didchange, 1,
+    "textDocument/didChange", 1, _lsp_method_textdocument_didchange, NULL,
 };

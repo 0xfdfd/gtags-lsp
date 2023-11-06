@@ -57,7 +57,7 @@ static void _lsp_method_workspace_didchangeworkspacefolders_add(cJSON* j_added)
     }
 }
 
-static void _lsp_method_workspace_didchangeworkspacefolders(cJSON* req, cJSON* rsp)
+static int _lsp_method_workspace_didchangeworkspacefolders(cJSON* req, cJSON* rsp)
 {
     (void)rsp;
 
@@ -72,8 +72,11 @@ static void _lsp_method_workspace_didchangeworkspacefolders(cJSON* req, cJSON* r
 
     _lsp_method_workspace_didchangeworkspacefolders_remove(j_removed);
     _lsp_method_workspace_didchangeworkspacefolders_add(j_added);
+
+    return 0;
 }
 
 lsp_method_t lsp_method_workspace_didchangeworkspacefolders = {
-    "workspace/didChangeWorkspaceFolders", _lsp_method_workspace_didchangeworkspacefolders, 1,
+    "workspace/didChangeWorkspaceFolders", 1,
+    _lsp_method_workspace_didchangeworkspacefolders, NULL,
 };

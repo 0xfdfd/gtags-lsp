@@ -2,6 +2,8 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include "runtime.h"
+#include "log.h"
+#include "utils/lsp_msg.h"
 
 typedef struct tag_lsp_log_s
 {

@@ -2,7 +2,7 @@
 #include "__init__.h"
 #include "runtime.h"
 
-static void _lsp_method_set_trace(cJSON* req, cJSON* rsp)
+static int _lsp_method_set_trace(cJSON* req, cJSON* rsp)
 {
     (void)rsp;
 
@@ -22,8 +22,10 @@ static void _lsp_method_set_trace(cJSON* req, cJSON* rsp)
     {
         g_tags.trace_value = LSP_TRACE_VALUE_OFF;
     }
+
+    return 0;
 }
 
 lsp_method_t lsp_method_set_trace = {
-    "$/setTrace", _lsp_method_set_trace, 1,
+    "$/setTrace", 1, _lsp_method_set_trace, NULL,
 };
