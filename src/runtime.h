@@ -5,6 +5,7 @@
 #include <cjson/cJSON.h>
 #include "utils/list.h"
 #include "utils/lsp_parser.h"
+#include "utils/log.h"
 #include "defines.h"
 
 #ifdef __cplusplus
@@ -48,27 +49,27 @@ typedef struct workspace_folder
 
 typedef struct tag_lsp_work
 {
-    ev_list_node_t      node;                   /**< List node for #tags_ctx_t::work_queue */
-    uv_work_t           token;                  /**< Work token. */
+    ev_list_node_t              node;                   /**< List node for #tags_ctx_t::work_queue */
+    uv_work_t                   token;                  /**< Work token. */
 
-    cJSON*              req;                    /**< LSP request. */
-    cJSON*              rsp;                    /**< LSP response. `NULL` if #tag_lsp_work_t::notify is true. */
+    cJSON*                      req;                    /**< LSP request. */
+    cJSON*                      rsp;                    /**< LSP response. `NULL` if #tag_lsp_work_t::notify is true. */
 
-    int                 notify;                 /**< (Boolean) request is a notification. */
-    int                 cancel;                 /**< (Boolean) request can be cancel. */
+    int                         notify;                 /**< (Boolean) request is a notification. */
+    int                         cancel;                 /**< (Boolean) request can be cancel. */
 } tag_lsp_work_t;
 
 typedef struct tags_ctx_s
 {
-    uv_loop_t           loop;                   /**< Event loop. */
-    uv_tty_t            tty_stdin;              /**< Stdin. */
-    uv_tty_t            tty_stdout;             /**< Stdout. */
-    lsp_parser_t        parser;                 /**< parser for language server protocol. */
+    uv_loop_t                   loop;                   /**< Event loop. */
+    uv_tty_t                    tty_stdin;              /**< Stdin. */
+    uv_tty_t                    tty_stdout;             /**< Stdout. */
+    lsp_parser_t                parser;                 /**< parser for language server protocol. */
 
-    workspace_folder_t* workspace_folders;      /**< Workspace folders list. */
-    size_t              workspace_folder_sz;    /**< Workspace folders list size. */
-    cJSON*              client_capabilities;    /**< Client capabilities. */
-    lsp_trace_value_t   trace_value;            /**< Trace value. */
+    workspace_folder_t*         workspace_folders;      /**< Workspace folders list. */
+    size_t                      workspace_folder_sz;    /**< Workspace folders list size. */
+    cJSON*                      client_capabilities;    /**< Client capabilities. */
+    lsp_trace_value_t           trace_value;            /**< Trace value. */
 
     struct
     {
@@ -77,20 +78,49 @@ typedef struct tags_ctx_s
          * If a server receives requests after a shutdown request those requests
          * should error with `InvalidRequest`.
          */
-        int             shutdown;
+        int                     shutdown;
     } flags;
 
-    ev_list_t           work_queue;             /**< #tag_lsp_work_t */
-    uv_mutex_t          work_queue_mutex;
+    ev_list_t                   work_queue;             /**< #tag_lsp_work_t */
+    uv_mutex_t                  work_queue_mutex;       /**< Mutex for #tags_ctx_t::work_queue */
+
+    tag_lsp_log_ctx_t           log_ctx;                /**< Log context. */
 } tags_ctx_t;
 
-extern tags_ctx_t       g_tags;                 /**< Global runtime. */
+extern tags_ctx_t               g_tags;                 /**< Global runtime. */
 
 cJSON* tag_lsp_create_rsp_from_req(cJSON* req);
+
+/**
+ * @brief Create a response from request with error code.
+ * @param[in] req   Request message.
+ * @param[in] code  Error code.
+ * @param[in] data  Error data. This function take the ownership of \p data.
+ */
 cJSON* tag_lsp_create_error_fomr_req(cJSON* req, int code, cJSON* data);
+
+/**
+ * @brief Create notification message.
+ * @param[in] method    Notification method.
+ * @param[in] params    Notification params. This function take the ownership of \p params.
+ */
+cJSON* tag_lsp_create_notify(const char* method, cJSON* params);
+
+/**
+ * @brief Set error code for msg.
+ * @param[in] rsp   Message to set.
+ * @param[in] code  Error code.
+ * @param[in] data  Error data. This function take the ownership of \p data.
+ */
 void tag_lsp_set_error(cJSON* rsp, int code, cJSON* data);
 
-int tag_lsp_send_rsp(cJSON* rsp);
+/**
+ * @brief Send LSP JSON-RPC.
+ * @param[in] msg   Message.
+ * @return          Error code.
+ */
+int tag_lsp_send_msg(cJSON* msg);
+
 int tag_lsp_send_error(cJSON* req, int code);
 
 void tag_lsp_cleanup_workspace_folders(void);

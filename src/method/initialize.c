@@ -155,7 +155,12 @@ static void _lsp_method_initialize(cJSON* req, cJSON* rsp)
     return;
 
 error:
-    tag_lsp_set_error(rsp, ret, NULL);
+    {
+        cJSON* err_dat = cJSON_CreateObject();
+        cJSON_AddBoolToObject(err_dat, "retry", 0);
+        tag_lsp_set_error(rsp, ret, err_dat);
+    }
+
     return;
 }
 

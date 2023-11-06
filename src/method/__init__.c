@@ -92,7 +92,7 @@ static void _lsp_method_after_work(uv_work_t* req, int status)
         }
         else
         {
-            tag_lsp_send_rsp(work->rsp);
+            tag_lsp_send_msg(work->rsp);
         }
     }
 

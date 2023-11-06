@@ -26,6 +26,21 @@ cJSON* tag_lsp_create_rsp_from_req(cJSON* req)
     return rsp;
 }
 
+cJSON* tag_lsp_create_notify(const char* method, cJSON* params)
+{
+    cJSON* msg = cJSON_CreateObject();
+
+    cJSON_AddStringToObject(msg, "jsonrpc", "2.0");
+    cJSON_AddStringToObject(msg, "method", method);
+
+    if (params != NULL)
+    {
+        cJSON_AddItemToObject(msg, "params", params);
+    }
+
+    return msg;
+}
+
 cJSON* tag_lsp_create_error_fomr_req(cJSON* req, int code, cJSON* data)
 {
     cJSON* rsp = tag_lsp_create_rsp_from_req(req);
@@ -43,7 +58,7 @@ void tag_lsp_set_error(cJSON* rsp, int code, cJSON* data)
 
     if (data != NULL)
     {
-        cJSON_AddItemToObject(errobj, "data", cJSON_Duplicate(data, 1));
+        cJSON_AddItemToObject(errobj, "data", data);
     }
 
     cJSON_AddItemToObject(rsp, "error", errobj);
@@ -68,13 +83,17 @@ static void _on_tty_stdout(uv_write_t* req, int status)
     _runtime_release_send_buf(impl);
 }
 
-int tag_lsp_send_rsp(cJSON* rsp)
+int tag_lsp_send_msg(cJSON* msg)
 {
     int ret;
     tty_stdout_req_t* stdout_req = malloc(sizeof(tty_stdout_req_t));
+    if (stdout_req == NULL)
+    {
+        abort();
+    }
 
     {
-        char* dat = cJSON_PrintUnformatted(rsp);
+        char* dat = cJSON_PrintUnformatted(msg);
         unsigned int dat_sz = (unsigned int)strlen(dat);
         stdout_req->bufs[1] = uv_buf_init(dat, dat_sz);
     }
@@ -100,7 +119,7 @@ int tag_lsp_send_rsp(cJSON* rsp)
 int tag_lsp_send_error(cJSON* req, int code)
 {
     cJSON* rsp = tag_lsp_create_error_fomr_req(req, code, NULL);
-    tag_lsp_send_rsp(rsp);
+    tag_lsp_send_msg(rsp);
     cJSON_Delete(rsp);
     return 0;
 }

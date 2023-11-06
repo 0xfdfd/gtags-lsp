@@ -13,6 +13,8 @@ static void _at_exit(void)
     uv_close((uv_handle_t*)&g_tags.tty_stdin, NULL);
     uv_close((uv_handle_t*)&g_tags.tty_stdout, NULL);
 
+    tag_lsp_log_exit_1();
+
     /* Ensure all handle closed. */
     if (uv_run(&g_tags.loop, UV_RUN_DEFAULT) != 0)
     {
@@ -25,10 +27,13 @@ static void _at_exit(void)
         abort();
     }
 
+    tag_lsp_log_exit_2();
+
     lsp_parser_exit(&g_tags.parser);
     uv_mutex_destroy(&g_tags.work_queue_mutex);
     tag_lsp_cleanup_workspace_folders();
     tag_lsp_cleanup_client_capabilities();
+
     uv_library_shutdown();
 }
 
@@ -65,6 +70,7 @@ static char** _initialize(int argc, char* argv[])
     ev_list_init(&g_tags.work_queue);
     uv_mutex_init(&g_tags.work_queue_mutex);
 
+    tag_lsp_log_init();
     lsp_parser_init(&g_tags.parser, _handle_request);
 
     return argv;
