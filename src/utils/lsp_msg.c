@@ -9,6 +9,7 @@
 #include "utils/lsp_error.h"
 #include "utils/io.h"
 #include "utils/log.h"
+#include "utils/alloc.h"
 
 typedef struct lsp_msg_ele
 {
@@ -60,9 +61,13 @@ static lsp_msg_ele_t* _lsp_msg_get_one(void)
 
 static void _runtime_release_send_buf(lsp_msg_ele_t* req)
 {
-    free(req->bufs[0].base);
+    lsp_free(req->bufs[0].base);
+    req->bufs[0].base = NULL;
+
     cJSON_free(req->bufs[1].base);
-    free(req);
+    req->bufs[1].base = NULL;
+
+    lsp_free(req);
 }
 
 static void _on_tty_stdout(uv_write_t* req, int status)
@@ -86,6 +91,9 @@ static void _lsp_msg_on_notify(uv_async_t* handle)
 
     while ((rsp = _lsp_msg_get_one()) != NULL)
     {
+        LSP_LOG(LSP_MSG_DEBUG, "outcoming -->\n%s%s",
+            rsp->bufs[0].base, rsp->bufs[1].base);
+
         ret = tag_lsp_io_write(&rsp->req, rsp->bufs, 2, _on_tty_stdout);
         if (ret != 0)
         {
@@ -106,17 +114,13 @@ static void _lsp_msg_on_notifier_close(uv_handle_t* handle)
     uv_mutex_destroy(&s_msg_ctx->req_queue_mutex);
     uv_mutex_destroy(&s_msg_ctx->req_id_mutex);
 
-    free(s_msg_ctx);
+    lsp_free(s_msg_ctx);
     s_msg_ctx = NULL;
 }
 
 static void _lsp_send_msg(cJSON* msg)
 {
-    lsp_msg_ele_t* stdout_req = malloc(sizeof(lsp_msg_ele_t));
-    if (stdout_req == NULL)
-    {
-        abort();
-    }
+    lsp_msg_ele_t* stdout_req = lsp_malloc(sizeof(lsp_msg_ele_t));
 
     {
         char* dat = cJSON_PrintUnformatted(msg);
@@ -125,7 +129,7 @@ static void _lsp_send_msg(cJSON* msg)
     }
 
     size_t header_sz = 100;
-    stdout_req->bufs[0].base = malloc(header_sz);
+    stdout_req->bufs[0].base = lsp_malloc(header_sz);
 
     stdout_req->bufs[0].len = snprintf(stdout_req->bufs[0].base, header_sz,
         "Content-Length:%lu\r\n"
@@ -219,17 +223,12 @@ static void _lsp_method_after_work(lsp_work_t* req, int status)
         cJSON_Delete(work->rsp);
         work->rsp = NULL;
     }
-    free(work);
+    lsp_free(work);
 }
 
 static void _lsp_handle_req(cJSON* req, int is_notify)
 {
-    tag_lsp_work_method_t* work = malloc(sizeof(tag_lsp_work_method_t));
-    if (work == NULL)
-    {
-        abort();
-    }
-
+    tag_lsp_work_method_t* work = lsp_malloc(sizeof(tag_lsp_work_method_t));
     work->req = cJSON_Duplicate(req, 1);
     work->rsp = NULL;
     work->notify = is_notify;
@@ -275,11 +274,7 @@ uint64_t lsp_new_id(void)
 
 int tag_lsp_msg_init(void)
 {
-    if ((s_msg_ctx = malloc(sizeof(lsp_msg_ctx_t))) == NULL)
-    {
-        fprintf(stderr, "out of memory.\n");
-        exit(EXIT_FAILURE);
-    }
+    s_msg_ctx = lsp_malloc(sizeof(lsp_msg_ctx_t));
 
     ev_list_init(&s_msg_ctx->msg_queue);
     uv_mutex_init(&s_msg_ctx->msg_queue_mutex);
@@ -398,7 +393,7 @@ void lsp_handle_msg(cJSON* msg)
 #if 1
     {
         char* buf = cJSON_PrintUnformatted(msg);
-        LSP_LOG(LSP_MSG_DEBUG, "incoming --> %s", buf);
+        LSP_LOG(LSP_MSG_DEBUG, "incoming -->\n%s", buf);
         cJSON_free(buf);
     }
 #endif

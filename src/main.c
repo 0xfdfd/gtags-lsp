@@ -212,6 +212,8 @@ static char** _initialize(int argc, char* argv[])
     argv = uv_setup_args(argc, argv);
     uv_disable_stdio_inheritance();
 
+    g_tags.config.lsp_log_level = LSP_MSG_INFO;
+
     /* Initialize event loop. */
     g_tags.loop = malloc(sizeof(uv_loop_t));
     if (uv_loop_init(g_tags.loop) != 0)

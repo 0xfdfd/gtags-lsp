@@ -24,6 +24,7 @@ typedef struct lsp_log_ctx
     uv_async_t                  log_queue_notifier;     /**< Notifier for #tags_ctx_t::log_queue. */
 
     FILE*                       logfile;
+    uv_mutex_t                  logfile_mutex;
 } lsp_log_ctx_t;
 
 static lsp_log_ctx_t*           s_log_ctx = NULL;
@@ -66,7 +67,7 @@ static const char* _log_filename(const char* file)
 
 static void _log_post_lsp_log_message(lsp_log_t* log)
 {
-    if (!g_tags.flags.initialized)
+    if (!g_tags.flags.initialized || (int)log->type > g_tags.config.lsp_log_level)
     {
         return;
     }
@@ -114,6 +115,8 @@ static const char* _log_msg_type(lsp_trace_message_type_t type)
 
 void lsp_direct_log(const char* data)
 {
+    uv_mutex_lock(&s_log_ctx->logfile_mutex);
+
 	if (s_log_ctx->logfile != NULL)
 	{
 		fprintf(s_log_ctx->logfile, "%s", data);
@@ -123,6 +126,8 @@ void lsp_direct_log(const char* data)
 	{
 		fprintf(stderr, "%s", data);
 	}
+
+    uv_mutex_unlock(&s_log_ctx->logfile_mutex);
 }
 
 static void _log_post_file_log_message(lsp_log_t* log)
@@ -171,6 +176,7 @@ static void _tag_lsp_on_log_exit(uv_handle_t* handle)
     }
 
     uv_mutex_destroy(&s_log_ctx->log_queue_mutex);
+    uv_mutex_destroy(&s_log_ctx->logfile_mutex);
 
     free(s_log_ctx);
     s_log_ctx = NULL;
@@ -258,6 +264,7 @@ void lsp_log_init(void)
     uv_async_init(g_tags.loop, &s_log_ctx->log_queue_notifier, _on_log_queue);
 
     _lsp_log_init_logfile();
+    uv_mutex_init(&s_log_ctx->logfile_mutex);
 }
 
 void lsp_log_exit(void)

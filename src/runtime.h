@@ -60,6 +60,7 @@ typedef struct tags_ctx_s
     {
         char*                   logdir;                 /**< The directory to store log. */
         char*                   logfile;                /**< The log file path. */
+        int                     lsp_log_level;          /**< Notification log level. see #lsp_trace_message_type_t. */
     } config;
 
     struct
