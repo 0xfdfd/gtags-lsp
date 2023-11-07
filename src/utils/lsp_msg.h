@@ -86,8 +86,11 @@ void lsp_send_rsp(cJSON* msg);
  */
 void lsp_send_notify(cJSON* msg);
 
-void lsp_handle_req(cJSON* req, int is_notify);
-void lsp_handle_rsp(cJSON* rsp);
+/**
+ * @brief Handle incoming message.
+ * @param[in] msg   Incoming message.
+ */
+void lsp_handle_msg(cJSON* msg);
 
 /**
  * @brief Generate a new id.

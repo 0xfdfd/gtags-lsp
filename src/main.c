@@ -119,24 +119,7 @@ static int _handle_request(cJSON* msg, void* arg)
 {
     (void)arg;
 
-    lsp_msg_type_t msg_type = lsp_msg_type(msg);
-
-#if 0
-    {
-        char* buf = cJSON_PrintUnformatted(msg);
-        LSP_LOG(LSP_MSG_DEBUG, "incoming --> %s", buf);
-        cJSON_free(buf);
-    }
-#endif
-
-    if (msg_type == LSP_MSG_RSP)
-    {
-        lsp_handle_rsp(msg);
-    }
-    else
-    {
-        lsp_handle_req(msg, msg_type == LSP_MSG_NFY);
-    }
+    lsp_handle_msg(msg);
 
     return 0;
 }

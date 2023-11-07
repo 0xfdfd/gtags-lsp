@@ -222,6 +222,45 @@ static void _lsp_method_after_work(lsp_work_t* req, int status)
     free(work);
 }
 
+static void _lsp_handle_req(cJSON* req, int is_notify)
+{
+    tag_lsp_work_method_t* work = malloc(sizeof(tag_lsp_work_method_t));
+    if (work == NULL)
+    {
+        abort();
+    }
+
+    work->req = cJSON_Duplicate(req, 1);
+    work->rsp = NULL;
+    work->notify = is_notify;
+    work->cancel = 0;
+
+    lsp_queue_work(&work->token, LSP_WORK_METHOD, _lsp_method_on_work, _lsp_method_after_work);
+}
+
+static void _lsp_handle_rsp(cJSON* rsp)
+{
+    ev_list_node_t* it;
+    cJSON* j_id = cJSON_GetObjectItem(rsp, "id");
+
+    uv_mutex_lock(&s_msg_ctx->req_queue_mutex);
+    {
+        it = ev_list_begin(&s_msg_ctx->req_queue);
+        for (; it != NULL; it = ev_list_next(it))
+        {
+            lsp_msg_req_t* msg_req = container_of(it, lsp_msg_req_t, node);
+            cJSON* orig_id = cJSON_GetObjectItem(msg_req->req, "id");
+            if (cJSON_Compare(j_id, orig_id, 0))
+            {
+                msg_req->rsp = cJSON_Duplicate(rsp, 1);
+                uv_sem_post(&msg_req->sem);
+                break;
+            }
+        }
+    }
+    uv_mutex_unlock(&s_msg_ctx->req_queue_mutex);
+}
+
 uint64_t lsp_new_id(void)
 {
     uint64_t id;
@@ -352,43 +391,26 @@ void lsp_send_notify(cJSON* msg)
     _lsp_send_msg(msg);
 }
 
-void lsp_handle_req(cJSON* req, int is_notify)
+void lsp_handle_msg(cJSON* msg)
 {
-    tag_lsp_work_method_t* work = malloc(sizeof(tag_lsp_work_method_t));
-    if (work == NULL)
+    lsp_msg_type_t msg_type = lsp_msg_type(msg);
+
+#if 1
     {
-        abort();
+        char* buf = cJSON_PrintUnformatted(msg);
+        LSP_LOG(LSP_MSG_DEBUG, "incoming --> %s", buf);
+        cJSON_free(buf);
     }
+#endif
 
-    work->req = cJSON_Duplicate(req, 1);
-    work->rsp = NULL;
-    work->notify = is_notify;
-    work->cancel = 0;
-
-    lsp_queue_work(&work->token, LSP_WORK_METHOD, _lsp_method_on_work, _lsp_method_after_work);
-}
-
-void lsp_handle_rsp(cJSON* rsp)
-{
-    ev_list_node_t* it;
-    cJSON* j_id = cJSON_GetObjectItem(rsp, "id");
-
-    uv_mutex_lock(&s_msg_ctx->req_queue_mutex);
+    if (msg_type == LSP_MSG_RSP)
     {
-        it = ev_list_begin(&s_msg_ctx->req_queue);
-        for (; it != NULL; it = ev_list_next(it))
-        {
-            lsp_msg_req_t* msg_req = container_of(it, lsp_msg_req_t, node);
-            cJSON* orig_id = cJSON_GetObjectItem(msg_req->req, "id");
-            if (cJSON_Compare(j_id, orig_id, 0))
-            {
-                msg_req->rsp = cJSON_Duplicate(rsp, 1);
-                uv_sem_post(&msg_req->sem);
-                break;
-            }
-        }
+        _lsp_handle_rsp(msg);
     }
-    uv_mutex_unlock(&s_msg_ctx->req_queue_mutex);
+    else
+    {
+        _lsp_handle_req(msg, msg_type == LSP_MSG_NFY);
+    }
 }
 
 cJSON* lsp_send_req(cJSON* req)

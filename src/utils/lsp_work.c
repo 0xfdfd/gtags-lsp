@@ -41,12 +41,6 @@ static void _lsp_on_after_work(uv_work_t* req, int status)
 {
     lsp_work_t* work = container_of(req, lsp_work_t, token);
 
-    uv_mutex_lock(&s_work_ctx->work_queue_mutex);
-    {
-        ev_list_erase(&s_work_ctx->work_queue, &work->node);
-    }
-    uv_mutex_unlock(&s_work_ctx->work_queue_mutex);
-
     if (work->after_work_cb != NULL)
     {
         work->after_work_cb(work, status);
