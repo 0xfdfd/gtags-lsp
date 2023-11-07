@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
+#include <inttypes.h>
 #include "method/__init__.h"
 #include "utils/lsp_error.h"
 #include "utils/lsp_msg.h"
@@ -10,6 +11,7 @@
 
 #if defined(WIN32)
 #   define sscanf(str, fmt, ...)    sscanf_s(str, fmt, ##__VA_ARGS__)
+#   define strdup(s)                _strdup(s)
 #endif
 
 static const char* s_help =
@@ -27,8 +29,19 @@ static const char* s_help =
 "  --port=[NUMBER]\n"
 "    Uses a socket as the communication channel.\n"
 "\n"
+"  --logdir=[PATH]\n"
+"    The directory to store log.\n"
+"\n"
 "  -h, --help\n"
 "    Show this help and exit.\n";
+
+static const char* s_welcome =
+"lsp-tags is a language server that provides IDE-like features to editors.\n"
+"\n"
+"Homepage: https://github.com/0xfdfd/gtags-lsp\n"
+"\n"
+"lsp-tags accepts flags on the commandline. For more information, checkout\n"
+"command line option `--help`.\n";
 
 static void _cleanup_loop(void)
 {
@@ -57,7 +70,7 @@ static void _at_exit_stage_1(void)
 {
     tag_lsp_msg_exit();
     tag_lsp_io_exit();
-    tag_lsp_log_exit();
+    lsp_log_exit();
     lsp_work_exit();
 }
 
@@ -67,6 +80,12 @@ static void _at_exit_stage_2(void)
     {
         lsp_parser_destroy(g_tags.parser);
         g_tags.parser = NULL;
+    }
+
+    if (g_tags.config.logdir != NULL)
+    {
+        free(g_tags.config.logdir);
+        g_tags.config.logdir = NULL;
     }
 
     tag_lsp_cleanup_workspace_folders();
@@ -133,14 +152,19 @@ static void _setup_io_or_help(char* argv[])
 
         if (strcmp(argv[i], "--stdio") == 0)
         {
-            goto init_io_as_stdio;
+            io_cfg.type = TAG_LSP_IO_STDIO;
+            tag_lsp_io_init(&io_cfg);
+            continue;
         }
 
         opt = "--pipe=";
         if (strncmp(argv[i], opt, strlen(opt)) == 0)
         {
             opt = argv[i] + strlen(opt);
-            goto init_io_as_pipe;
+            io_cfg.type = TAG_LSP_IO_PIPE;
+            io_cfg.data.file = opt;
+            tag_lsp_io_init(&io_cfg);
+            continue;
         }
 
         opt = "--port=";
@@ -152,28 +176,23 @@ static void _setup_io_or_help(char* argv[])
                 fprintf(stderr, "invalid value for `--port`: %s.\n", opt);
                 exit(EXIT_FAILURE);
             }
-            goto init_io_as_socket;
+            io_cfg.type = TAG_LSP_IO_PORT;
+            io_cfg.data.port = ret;
+            tag_lsp_io_init(&io_cfg);
+            continue;
         }
-    }
 
-init_io_as_stdio:
-    io_cfg.type = TAG_LSP_IO_STDIO;
-    goto finish;
-
-init_io_as_pipe:
-    io_cfg.type = TAG_LSP_IO_PIPE;
-    io_cfg.data.file = opt;
-    goto finish;
-
-init_io_as_socket:
-    io_cfg.type = TAG_LSP_IO_PORT;
-    io_cfg.data.port = ret;
-    goto finish;
-
-finish:
-    if ((ret = tag_lsp_io_init(&io_cfg)) != 0)
-    {
-        abort();
+        opt = "--logdir=";
+        if (strncmp(argv[i], opt, strlen(opt)) == 0)
+        {
+            opt = argv[i] + strlen(opt);
+            if (g_tags.config.logdir != NULL)
+            {
+                free(g_tags.config.logdir);
+            }
+            g_tags.config.logdir = strdup(opt);
+            continue;
+        }
     }
 }
 
@@ -192,12 +211,20 @@ static char** _initialize(int argc, char* argv[])
     _setup_io_or_help(argv);
 
     tag_lsp_msg_init();
-    tag_lsp_log_init();
+    lsp_log_init();
     lsp_work_init();
 
     g_tags.parser = lsp_parser_create(_handle_request);
 
     return argv;
+}
+
+static void _show_welecome(void)
+{
+    lsp_direct_log(s_welcome);
+    lsp_direct_log("\n");
+
+    LSP_LOG(LSP_MSG_INFO, "PID: %" PRId64, (int64_t)uv_os_getpid());
 }
 
 int main(int argc, char* argv[])
@@ -207,6 +234,9 @@ int main(int argc, char* argv[])
 
     /* Global initialize. */
     argv = _initialize(argc, argv);
+
+    /* Let's welcome user. */
+    _show_welecome();
 
     /* Run. */
     uv_run(g_tags.loop, UV_RUN_DEFAULT);

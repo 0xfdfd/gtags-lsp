@@ -29,7 +29,7 @@ typedef struct tag_lsp_io_cfg
     tag_lsp_io_cb       cb;
 } tag_lsp_io_cfg_t;
 
-int tag_lsp_io_init(tag_lsp_io_cfg_t* cfg);
+void tag_lsp_io_init(tag_lsp_io_cfg_t* cfg);
 
 void tag_lsp_io_exit(void);
 

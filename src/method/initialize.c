@@ -183,6 +183,7 @@ static int _lsp_method_initialize(cJSON* req, cJSON* rsp)
 
     _lsp_method_initialize_generate_rsp(rsp);
     _lsp_method_init_update_tags();
+    g_tags.flags.initialized = 1;
 
     return 0;
 

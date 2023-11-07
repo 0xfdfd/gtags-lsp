@@ -1,11 +1,13 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <inttypes.h>
+#include <string.h>
 #include "runtime.h"
 #include "log.h"
 #include "utils/lsp_msg.h"
 
-typedef struct tag_lsp_log_s
+typedef struct lsp_log_s
 {
     ev_list_node_t              node;                   /**< List node for #tags_ctx_t::log_queue */
     lsp_trace_message_type_t    type;                   /**< Message type. */
@@ -13,18 +15,20 @@ typedef struct tag_lsp_log_s
     const char*                 func;                   /**< Function name. */
     int                         line;                   /**< Line number. */
     char*                       message;                /**< The actual message. */
-} tag_lsp_log_t;
+} lsp_log_t;
 
-typedef struct tag_lsp_log_ctx
+typedef struct lsp_log_ctx
 {
     ev_list_t                   log_queue;              /**< log queue. */
     uv_mutex_t                  log_queue_mutex;        /**< Mutex for #tags_ctx_t::log_queue */
     uv_async_t                  log_queue_notifier;     /**< Notifier for #tags_ctx_t::log_queue. */
-} tag_lsp_log_ctx_t;
 
-static tag_lsp_log_ctx_t* s_log_ctx = NULL;
+    FILE*                       logfile;
+} lsp_log_ctx_t;
 
-static tag_lsp_log_t* _pop_log_from_queue(void)
+static lsp_log_ctx_t*           s_log_ctx = NULL;
+
+static lsp_log_t* _pop_log_from_queue(void)
 {
     ev_list_node_t* node;
     uv_mutex_lock(&s_log_ctx->log_queue_mutex);
@@ -38,7 +42,7 @@ static tag_lsp_log_t* _pop_log_from_queue(void)
         return NULL;
     }
 
-    return container_of(node, tag_lsp_log_t, node);
+    return container_of(node, lsp_log_t, node);
 }
 
 static const char* _log_filename(const char* file)
@@ -60,13 +64,18 @@ static const char* _log_filename(const char* file)
     return pos;
 }
 
-static void _log_post_lsp_log_message(tag_lsp_log_t* log)
+static void _log_post_lsp_log_message(lsp_log_t* log)
 {
-    int len = snprintf(NULL, 0, "[%s:%d %s] %s",
-        log->file, log->line, log->func, log->message);
+    if (!g_tags.flags.initialized)
+    {
+        return;
+    }
+
+    int len = snprintf(NULL, 0, "[%s:%d] %s",
+        log->file, log->line, log->message);
     char* buf = malloc(len + 1);
-    snprintf(buf, len + 1, "[%s:%d %s] %s",
-        log->file, log->line, log->func, log->message);
+    snprintf(buf, len + 1, "[%s:%d] %s",
+        log->file, log->line, log->message);
 
     cJSON* params = cJSON_CreateObject();
     cJSON_AddNumberToObject(params, "type", log->type);
@@ -103,20 +112,31 @@ static const char* _log_msg_type(lsp_trace_message_type_t type)
     return "D";
 }
 
-static void _log_post_file_log_message(tag_lsp_log_t* log)
+void lsp_direct_log(const char* data)
+{
+	if (s_log_ctx->logfile != NULL)
+	{
+		fprintf(s_log_ctx->logfile, "%s", data);
+        fflush(s_log_ctx->logfile);
+	}
+	else
+	{
+		fprintf(stderr, "%s", data);
+	}
+}
+
+static void _log_post_file_log_message(lsp_log_t* log)
 {
     const char* type = _log_msg_type(log->type);
 
-    int len = snprintf(NULL, 0, "[%s %s:%d %s] %s\n",
-        type, log->file, log->line, log->func, log->message);
+    int len = snprintf(NULL, 0, "%s[%s:%d] %s\n",
+        type, log->file, log->line, log->message);
 
     char* buf = malloc(len + 1);
-    snprintf(buf, len + 1, "[%s %s:%d %s] %s\n",
-        type, log->file, log->line, log->func, log->message);
+    snprintf(buf, len + 1, "%s[%s:%d] %s\n",
+        type, log->file, log->line, log->message);
 
-    fprintf(stderr, "%s", buf);
-
-    // TODO: write to log file.
+    lsp_direct_log(buf);
 
     free(buf);
 }
@@ -125,7 +145,7 @@ static void _on_log_queue(uv_async_t* handle)
 {
     (void)handle;
 
-    tag_lsp_log_t* log;
+    lsp_log_t* log;
     while ((log = _pop_log_from_queue()) != NULL)
     {
         log->file = _log_filename(log->file);
@@ -137,27 +157,20 @@ static void _on_log_queue(uv_async_t* handle)
     }
 }
 
-void tag_lsp_log_init(void)
-{
-    if ((s_log_ctx = malloc(sizeof(tag_lsp_log_ctx_t))) == NULL)
-    {
-        fprintf(stderr, "out of memory.\n");
-        exit(EXIT_FAILURE);
-    }
-
-    ev_list_init(&s_log_ctx->log_queue);
-    uv_mutex_init(&s_log_ctx->log_queue_mutex);
-    uv_async_init(g_tags.loop, &s_log_ctx->log_queue_notifier, _on_log_queue);
-}
-
 static void _tag_lsp_on_log_exit(uv_handle_t* handle)
 {
     (void)handle;
 
-    tag_lsp_log_t* log;
+    lsp_log_t* log;
     while ((log = _pop_log_from_queue()) != NULL)
     {
         free(log);
+    }
+
+    if (s_log_ctx->logfile != NULL)
+    {
+        fclose(s_log_ctx->logfile);
+        s_log_ctx->logfile = NULL;
     }
 
     uv_mutex_destroy(&s_log_ctx->log_queue_mutex);
@@ -166,7 +179,72 @@ static void _tag_lsp_on_log_exit(uv_handle_t* handle)
     s_log_ctx = NULL;
 }
 
-void tag_lsp_log_exit(void)
+#if !defined(WIN32)
+static int fopen_s(FILE** stream, const char* path, const char* mode)
+{
+    if ((*stream = fopen(path, mode)) == NULL)
+    {
+        return errno;
+    }
+    return 0;
+}
+#endif
+
+static void _lsp_log_init_logfile(void)
+{
+    if (g_tags.config.logdir == NULL)
+    {
+        s_log_ctx->logfile = NULL;
+        return;
+    }
+
+	uv_pid_t pid = uv_os_getpid();
+
+	char pid_buf[32];
+	snprintf(pid_buf, sizeof(pid_buf), "%" PRId64, (int64_t)pid);
+
+	// logdir/tag-lsp.pid.log
+	size_t path_sz = strlen(g_tags.config.logdir) + strlen(pid_buf) + 14;
+	char* path = malloc(path_sz);
+    if (path == NULL)
+    {
+        fprintf(stderr, "out of memory.\n");
+        abort();
+    }
+	snprintf(path, path_sz, "%s/tag-lsp.%s.log", g_tags.config.logdir, pid_buf);
+
+	if (fopen_s(&s_log_ctx->logfile, path, "ab") != 0)
+	{
+		fprintf(stderr, "open logfile `%s` failed.\n", path);
+		free(path); path = NULL;
+		exit(EXIT_FAILURE);
+	}
+
+	free(path);
+    path = NULL;
+}
+
+void lsp_log_init(void)
+{
+    if (s_log_ctx != NULL)
+    {
+        return;
+    }
+
+    if ((s_log_ctx = malloc(sizeof(lsp_log_ctx_t))) == NULL)
+    {
+        fprintf(stderr, "out of memory.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    ev_list_init(&s_log_ctx->log_queue);
+    uv_mutex_init(&s_log_ctx->log_queue_mutex);
+    uv_async_init(g_tags.loop, &s_log_ctx->log_queue_notifier, _on_log_queue);
+
+    _lsp_log_init_logfile();
+}
+
+void lsp_log_exit(void)
 {
     if (s_log_ctx == NULL)
     {
@@ -176,7 +254,7 @@ void tag_lsp_log_exit(void)
     uv_close((uv_handle_t*)&s_log_ctx->log_queue_notifier, _tag_lsp_on_log_exit);
 }
 
-void tag_lsp_log(lsp_trace_message_type_t type, const char* file, const char* func,
+void lsp_log(lsp_trace_message_type_t type, const char* file, const char* func,
     int line, const char* fmt, ...)
 {
     int msg_len = 0;
@@ -190,8 +268,8 @@ void tag_lsp_log(lsp_trace_message_type_t type, const char* file, const char* fu
     }
     va_end(ap);
 
-    size_t malloc_size = sizeof(tag_lsp_log_t) + msg_len + 1;
-    tag_lsp_log_t* msg = malloc(malloc_size);
+    size_t malloc_size = sizeof(lsp_log_t) + msg_len + 1;
+    lsp_log_t* msg = malloc(malloc_size);
     if (msg == NULL)
     {
         abort();

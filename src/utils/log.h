@@ -4,8 +4,8 @@
 /**
  * @brief Log message to log file and post `window/logMessage` if support.
  */
-#define TAG_LSP_LOG(type, fmt, ...)   \
-    tag_lsp_log(type, __FILE__, __FUNCTION__, __LINE__, fmt, ##__VA_ARGS)
+#define LSP_LOG(type, fmt, ...)   \
+    lsp_log(type, __FILE__, __FUNCTION__, __LINE__, fmt, ##__VA_ARGS__)
 
 #ifdef __cplusplus
 extern "C" {
@@ -23,15 +23,21 @@ typedef enum lsp_trace_message_type
     LSP_MSG_DEBUG    = 5,
 } lsp_trace_message_type_t;
 
-void tag_lsp_log_init(void);
-void tag_lsp_log_exit(void);
+void lsp_log_init(void);
+void lsp_log_exit(void);
 
 /**
  * @brief Log message to log file and post `window/logMessage` if support.
  * @warning Always use #TAG_LSP_LOG().
  */
-void tag_lsp_log(lsp_trace_message_type_t type, const char* file, const char* func,
+void lsp_log(lsp_trace_message_type_t type, const char* file, const char* func,
     int line, const char* fmt, ...);
+
+/**
+ * @brief Direct write data to logfile.
+ * @param[in] data  Data to write.
+ */
+void lsp_direct_log(const char* data);
 
 #ifdef __cplusplus
 }

@@ -56,6 +56,11 @@ typedef struct tags_ctx_s
     cJSON*                      client_capabilities;    /**< Client capabilities. */
     lsp_trace_value_t           trace_value;            /**< Trace value. */
 
+    struct 
+    {
+        char*                   logdir;                 /**< The directory to store log. */
+    } config;
+
     struct
     {
         /**
@@ -64,6 +69,11 @@ typedef struct tags_ctx_s
          * should error with `InvalidRequest`.
          */
         int                     shutdown;
+
+        /**
+         * @brief Set if LSP server is initialized.
+         */
+        int                     initialized;
     } flags;
 } tags_ctx_t;
 

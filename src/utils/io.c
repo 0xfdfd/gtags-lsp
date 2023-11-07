@@ -143,8 +143,13 @@ static int _tag_lsp_init_io_as_socket(tag_lsp_io_cfg_t* cfg)
     return 0;
 }
 
-int tag_lsp_io_init(tag_lsp_io_cfg_t* cfg)
+void tag_lsp_io_init(tag_lsp_io_cfg_t* cfg)
 {
+    if (s_io_ctx != NULL)
+    {
+        return;
+    }
+
     if ((s_io_ctx = malloc(sizeof(tag_lsp_io_t))) == NULL)
     {
         fprintf(stderr, "out of memory.\n");
@@ -157,13 +162,16 @@ int tag_lsp_io_init(tag_lsp_io_cfg_t* cfg)
     switch (cfg->type)
     {
     case TAG_LSP_IO_STDIO:
-        return _tag_lsp_init_io_as_stdio(cfg);
+        _tag_lsp_init_io_as_stdio(cfg);
+        return;
 
     case TAG_LSP_IO_PIPE:
-        return _tag_lsp_init_io_as_pipe(cfg);
+        _tag_lsp_init_io_as_pipe(cfg);
+        return;
 
     case TAG_LSP_IO_PORT:
-        return _tag_lsp_init_io_as_socket(cfg);
+        _tag_lsp_init_io_as_socket(cfg);
+        return;
 
     default:
         break;
