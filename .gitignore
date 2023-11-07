@@ -92,3 +92,11 @@ compile_commands.json
 
 # JetBrains
 /.idea
+
+# Helix
+.helix
+
+# GNU Global
+/GPATH
+/GRTAGS
+/GTAGS
