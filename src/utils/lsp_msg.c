@@ -11,6 +11,18 @@
 #include "utils/log.h"
 #include "utils/alloc.h"
 
+typedef struct tag_lsp_work_method
+{
+    ev_list_node_t              node;
+	lsp_work_t*                 token;                  /**< Work token. */
+
+	cJSON*                      req;                    /**< LSP request. */
+	cJSON*                      rsp;                    /**< LSP response. `NULL` if #tag_lsp_work_t::notify is true. */
+
+	int                         notify;                 /**< (Boolean) request is a notification. */
+	int                         cancel;                 /**< (Boolean) request can be cancel. */
+} tag_lsp_work_method_t;
+
 typedef struct lsp_msg_ele
 {
     ev_list_node_t              node;
@@ -32,6 +44,9 @@ typedef struct lsp_msg_ctx
     uv_mutex_t                  msg_queue_mutex;    /**< Mutex for send queue. */
     uv_async_t                  msg_queue_notifier; /**< Notifier for send queue. */
 
+    ev_list_t                   in_req_queue;
+    uv_mutex_t                  in_req_queue_mutex;
+
     ev_list_t                   req_queue;
     uv_mutex_t                  req_queue_mutex;
 
@@ -40,6 +55,22 @@ typedef struct lsp_msg_ctx
 } lsp_msg_ctx_t;
 
 static lsp_msg_ctx_t*           s_msg_ctx = NULL;
+
+void lsp_msg_cancel_all_pending_request(void)
+{
+    ev_list_node_t* it;
+
+    uv_mutex_lock(&s_msg_ctx->req_queue_mutex);
+    {
+        it = ev_list_begin(&s_msg_ctx->req_queue);
+        for (; it != NULL; it = ev_list_next(it))
+        {
+            lsp_msg_req_t* req = container_of(it, lsp_msg_req_t, node);
+            uv_sem_post(&req->sem);
+        }
+    }
+    uv_mutex_unlock(&s_msg_ctx->req_queue_mutex);
+}
 
 static lsp_msg_ele_t* _lsp_msg_get_one(void)
 {
@@ -72,14 +103,16 @@ static void _runtime_release_send_buf(lsp_msg_ele_t* req)
 
 static void _on_tty_stdout(uv_write_t* req, int status)
 {
-    if (status != 0)
-    {
-        uv_stop(g_tags.loop);
-        return;
-    }
-
     lsp_msg_ele_t* impl = container_of(req, lsp_msg_ele_t, req);
     _runtime_release_send_buf(impl);
+
+	if (status != 0)
+	{
+        lsp_want_exit();
+		LSP_LOG(LSP_MSG_INFO, "write io failed: %s(%d).",
+			uv_strerror(status), status);
+		return;
+	}
 }
 
 static void _lsp_msg_on_notify(uv_async_t* handle)
@@ -111,6 +144,7 @@ static void _lsp_msg_on_notifier_close(uv_handle_t* handle)
     (void)handle;
 
     uv_mutex_destroy(&s_msg_ctx->msg_queue_mutex);
+    uv_mutex_destroy(&s_msg_ctx->in_req_queue_mutex);
     uv_mutex_destroy(&s_msg_ctx->req_queue_mutex);
     uv_mutex_destroy(&s_msg_ctx->req_id_mutex);
 
@@ -166,64 +200,76 @@ static int _lsp_msg_send_error(cJSON* req, int code)
     return 0;
 }
 
-static void _lsp_method_on_work(lsp_work_t* req)
+static void _lsp_method_on_normal_request(tag_lsp_work_method_t* work)
 {
     int ret = 0;
-    tag_lsp_work_method_t* work = container_of(req, tag_lsp_work_method_t, token);
 
-    /* Check whether it is a notify. */
-    if (!work->notify)
-    {
-        work->rsp = lsp_create_rsp(work->req);
-    }
-
-    /* Reject any request if we are shutdown. */
-    if (!work->notify && g_tags.flags.shutdown)
-    {
-        lsp_set_error(work->rsp, TAG_LSP_ERR_INVALID_REQUEST, NULL);
-        return;
-    }
-
-    /* Call method. */
-    ret = lsp_method_call(work->req, work->rsp, work->notify);
-    if (!work->notify && ret < 0)
-    {
-        lsp_set_error(work->rsp, ret, NULL);
-        return;
-    }
-    else if (!work->notify && ret == LSP_METHOD_ASYNC)
-    {
-        work->rsp = NULL;
-    }
+	/* Call method. */
+	ret = lsp_method_call(work->req, work->rsp, work->notify);
+	if (!work->notify && ret < 0)
+	{
+		lsp_set_error(work->rsp, ret, NULL);
+		return;
+	}
+	else if (!work->notify && ret == LSP_METHOD_ASYNC)
+	{
+		work->rsp = NULL;
+	}
 }
 
-static void _lsp_method_after_work(lsp_work_t* req, int status)
+static void _lsp_method_on_work(lsp_work_t* token, int cancel, void* arg)
 {
-    tag_lsp_work_method_t* work = container_of(req, tag_lsp_work_method_t, token);
+    (void)token;
+    tag_lsp_work_method_t* work = arg;
 
-    if (!work->notify)
+	/* Check whether it is a notify. */
+	if (!work->notify)
+	{
+		work->rsp = lsp_create_rsp(work->req);
+	}
+
+	/* Reject any request if we are shutdown. */
+	if (!work->notify && g_tags.flags.shutdown)
+	{
+		lsp_set_error(work->rsp, TAG_LSP_ERR_INVALID_REQUEST, NULL);
+        goto finish;
+	}
+
+    if (cancel)
     {
-        if (status != 0)
+        if (!work->notify)
         {
             _lsp_msg_send_error(work->req, TAG_LSP_ERR_REQUEST_CANCELLED);
         }
-        else
-        {
-            lsp_send_rsp(work->rsp);
-        }
+    }
+    else
+    {
+        _lsp_method_on_normal_request(work);
     }
 
-    if (work->req != NULL)
+finish:
+    if (!work->notify)
     {
-        cJSON_Delete(work->req);
-        work->req = NULL;
+        lsp_send_rsp(work->rsp);
     }
-    if (work->rsp != NULL)
+
+    uv_mutex_lock(&s_msg_ctx->in_req_queue_mutex);
     {
-        cJSON_Delete(work->rsp);
-        work->rsp = NULL;
+        ev_list_erase(&s_msg_ctx->in_req_queue, &work->node);
     }
-    lsp_free(work);
+    uv_mutex_unlock(&s_msg_ctx->in_req_queue_mutex);
+
+	if (work->req != NULL)
+	{
+		cJSON_Delete(work->req);
+		work->req = NULL;
+	}
+	if (work->rsp != NULL)
+	{
+		cJSON_Delete(work->rsp);
+		work->rsp = NULL;
+	}
+	lsp_free(work);
 }
 
 static void _lsp_handle_req(cJSON* req, int is_notify)
@@ -234,7 +280,34 @@ static void _lsp_handle_req(cJSON* req, int is_notify)
     work->notify = is_notify;
     work->cancel = 0;
 
-    lsp_queue_work(&work->token, LSP_WORK_METHOD, _lsp_method_on_work, _lsp_method_after_work);
+    uv_mutex_lock(&s_msg_ctx->in_req_queue_mutex);
+    {
+        ev_list_push_back(&s_msg_ctx->in_req_queue, &work->node);
+    }
+    uv_mutex_unlock(&s_msg_ctx->in_req_queue_mutex);
+
+    lsp_queue_work(&work->token, _lsp_method_on_work, work);
+}
+
+void lsp_handle_cancel(cJSON* id)
+{
+    ev_list_node_t* it;
+
+    uv_mutex_lock(&s_msg_ctx->in_req_queue_mutex);
+    {
+        it = ev_list_begin(&s_msg_ctx->in_req_queue);
+        for (; it != NULL; it = ev_list_next(it))
+        {
+            tag_lsp_work_method_t* work = container_of(it, tag_lsp_work_method_t, node);
+            cJSON* orig_id = cJSON_GetObjectItem(work->req, "id");
+            if (cJSON_Compare(id, orig_id, 1))
+            {
+                lsp_work_cancel(work->token);
+                break;
+            }
+        }
+    }
+    uv_mutex_unlock(&s_msg_ctx->in_req_queue_mutex);
 }
 
 static void _lsp_handle_rsp(cJSON* rsp)
@@ -272,13 +345,16 @@ uint64_t lsp_new_id(void)
     return id;
 }
 
-int tag_lsp_msg_init(void)
+int lsp_msg_init(void)
 {
     s_msg_ctx = lsp_malloc(sizeof(lsp_msg_ctx_t));
 
     ev_list_init(&s_msg_ctx->msg_queue);
     uv_mutex_init(&s_msg_ctx->msg_queue_mutex);
     uv_async_init(g_tags.loop, &s_msg_ctx->msg_queue_notifier, _lsp_msg_on_notify);
+
+    ev_list_init(&s_msg_ctx->in_req_queue);
+    uv_mutex_init(&s_msg_ctx->in_req_queue_mutex);
 
     ev_list_init(&s_msg_ctx->req_queue);
     uv_mutex_init(&s_msg_ctx->req_queue_mutex);

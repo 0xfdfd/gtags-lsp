@@ -68,7 +68,7 @@ static void _cleanup_loop(void)
         abort();
     }
 
-    free(g_tags.loop);
+    lsp_free(g_tags.loop);
     g_tags.loop = NULL;
 }
 
@@ -78,6 +78,8 @@ static void _at_exit_stage_1(void)
     tag_lsp_io_exit();
     lsp_log_exit();
     lsp_work_exit();
+
+    uv_close((uv_handle_t*)g_tags.sigint, NULL);
 }
 
 static void _at_exit_stage_2(void)
@@ -100,12 +102,35 @@ static void _at_exit_stage_2(void)
         g_tags.config.logfile = NULL;
     }
 
+    if (g_tags.sigint != NULL)
+    {
+        lsp_free(g_tags.sigint);
+        g_tags.sigint = NULL;
+    }
+
     tag_lsp_cleanup_workspace_folders();
     tag_lsp_cleanup_client_capabilities();
 }
 
+static void _wait_for_pending_task(void)
+{
+    size_t queue_size;
+    while ((queue_size = lsp_work_queue_size()) != 0)
+    {
+        uv_run(g_tags.loop, UV_RUN_ONCE);
+    }
+}
+
 static void _at_exit(void)
 {
+    /* Always set shutdown flag. */
+    g_tags.flags.shutdown = 1;
+
+    LSP_LOG(LSP_MSG_DEBUG, "cleanup...");
+
+    lsp_msg_cancel_all_pending_request();
+    _wait_for_pending_task();
+
     lsp_method_cleanup();
 
     _at_exit_stage_1();
@@ -207,6 +232,12 @@ static void _setup_io_or_help(tag_lsp_io_cfg_t* io_cfg, char* argv[])
     }
 }
 
+static void _on_signal(uv_signal_t* handle, int signum)
+{
+    (void)handle; (void)signum;
+    lsp_want_exit();
+}
+
 static char** _initialize(int argc, char* argv[])
 {
     argv = uv_setup_args(argc, argv);
@@ -215,11 +246,20 @@ static char** _initialize(int argc, char* argv[])
     g_tags.config.lsp_log_level = LSP_MSG_INFO;
 
     /* Initialize event loop. */
-    g_tags.loop = malloc(sizeof(uv_loop_t));
+    g_tags.loop = lsp_malloc(sizeof(uv_loop_t));
     if (uv_loop_init(g_tags.loop) != 0)
     {
+        fprintf(stderr, "initialize main event loop failed.\n");
         abort();
     }
+
+    g_tags.sigint = lsp_malloc(sizeof(uv_signal_t));
+    if (uv_signal_init(g_tags.loop, g_tags.sigint) != 0)
+    {
+        fprintf(stderr, "initialize sigint failed.\n");
+        abort();
+    }
+    uv_signal_start(g_tags.sigint, _on_signal, SIGINT);
 
     tag_lsp_io_cfg_t io_cfg;
     _setup_io_or_help(&io_cfg, argv);
@@ -230,7 +270,7 @@ static char** _initialize(int argc, char* argv[])
     /* Initialize IO layer. */
     tag_lsp_io_init(&io_cfg);
 
-    tag_lsp_msg_init();
+    lsp_msg_init();
     lsp_work_init();
 
     g_tags.parser = lsp_parser_create(_handle_request, NULL);
@@ -261,8 +301,12 @@ int main(int argc, char* argv[])
     /* Let's welcome user. */
     _show_welecome();
 
+    //uv_sleep(10 * 1000);
+
     /* Run. */
     uv_run(g_tags.loop, UV_RUN_DEFAULT);
+
+    LSP_LOG(LSP_MSG_INFO, "program about to exit.");
 
     return 0;
 }

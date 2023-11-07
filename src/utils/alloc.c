@@ -5,7 +5,7 @@
 void tag_lsp_alloc(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf)
 {
     (void)handle;
-    char* addr = malloc(suggested_size + 1);
+    char* addr = lsp_malloc(suggested_size + 1);
     *buf = uv_buf_init(addr, (unsigned int)suggested_size);
 }
 

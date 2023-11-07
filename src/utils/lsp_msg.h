@@ -15,18 +15,9 @@ typedef enum lsp_msg_type_e
     LSP_MSG_NFY,    /**< Notification message. */
 } lsp_msg_type_t;
 
-typedef struct tag_lsp_work_method
-{
-    lsp_work_t                  token;                  /**< Work token. */
+int lsp_msg_init(void);
 
-    cJSON*                      req;                    /**< LSP request. */
-    cJSON*                      rsp;                    /**< LSP response. `NULL` if #tag_lsp_work_t::notify is true. */
-
-    int                         notify;                 /**< (Boolean) request is a notification. */
-    int                         cancel;                 /**< (Boolean) request can be cancel. */
-} tag_lsp_work_method_t;
-
-int tag_lsp_msg_init(void);
+void lsp_msg_cancel_all_pending_request();
 void tag_lsp_msg_exit(void);
 
 /**
@@ -91,6 +82,8 @@ void lsp_send_notify(cJSON* msg);
  * @param[in] msg   Incoming message.
  */
 void lsp_handle_msg(cJSON* msg);
+
+void lsp_handle_cancel(cJSON* id);
 
 /**
  * @brief Generate a new id.

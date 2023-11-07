@@ -10,32 +10,7 @@ extern "C" {
 
 typedef struct lsp_work lsp_work_t;
 
-typedef void (*lsp_work_cb)(lsp_work_t* req);
-typedef void (*lsp_after_work_cb)(lsp_work_t* req, int status);
-typedef int (*lsp_foreach_cb)(lsp_work_t* work, void* arg);
-
-typedef enum lsp_work_type
-{
-    /**
-     * @brief LSP request or Notification call.
-     * @see #tag_lsp_work_method_t.
-     */
-    LSP_WORK_METHOD,
-
-
-    LSP_WORK_TASK,
-} lsp_work_type_t;
-
-struct lsp_work
-{
-    lsp_work_type_t     type;
-
-    ev_list_node_t      node;
-    uv_work_t           token;
-
-    lsp_work_cb         work_cb;
-    lsp_after_work_cb   after_work_cb;
-};
+typedef void (*lsp_work_cb)(lsp_work_t* token, int cancel, void* arg);
 
 /**
  * @brief Initialize work queue.
@@ -54,18 +29,15 @@ void lsp_work_exit(void);
  * @param[in] work_cb           Work callback.
  * @param[in] after_work_cb     After work callback.
  */
-void lsp_queue_work(lsp_work_t* work, lsp_work_type_t type,
-    lsp_work_cb work_cb, lsp_after_work_cb after_work_cb);
+void lsp_queue_work(lsp_work_t** token, lsp_work_cb work_cb, void* arg);
 
 /**
  * @brief Cancel work.
  * @param[in] work              Work token.
  */
-void lsp_work_cancel(lsp_work_t* work);
+void lsp_work_cancel(lsp_work_t* token);
 
 size_t lsp_work_queue_size(void);
-
-void lsp_work_foreach(lsp_foreach_cb cb, void* arg);
 
 #ifdef __cplusplus
 }

@@ -5,10 +5,13 @@
 #include "runtime.h"
 #include "utils/lsp_msg.h"
 #include "utils/execute.h"
+#include "utils/alloc.h"
 
-#if defined(WIN32)
-#   define strdup(s)    _strdup(s)
-#endif
+typedef struct lsp_work_task
+{
+	lsp_work_t* token;
+	char*       workspace;
+} lsp_work_task_t;
 
 static void _lsp_task_work_done_progress_begin(cJSON* workDoneToken, const char* title)
 {
@@ -102,19 +105,21 @@ static int _lsp_task_check_client_work_done_progress(void)
     return support;
 }
 
-static void _lsp_task_on_update_tags(lsp_work_t* req)
+static void _lsp_task_on_update_tags(lsp_work_t* token, int cancel, void* arg)
 {
-    lsp_work_task_t* task = container_of(req, lsp_work_task_t, token);
+    (void)token; (void)cancel;
+
+    lsp_work_task_t* task = arg;
 
     int support = _lsp_task_check_client_work_done_progress();
 
     char id[32];
     lsp_new_id_str(id, sizeof(id));
-    cJSON* token = cJSON_CreateString(id);
+    cJSON* j_id = cJSON_CreateString(id);
 
     if (support)
     {
-        _lsp_task_update_tags_pre(token);
+        _lsp_task_update_tags_pre(j_id);
     }
 
     char* args[] = { "gtags", "-i", NULL };
@@ -122,38 +127,18 @@ static void _lsp_task_on_update_tags(lsp_work_t* req)
 
     if (support)
     {
-        _lsp_task_update_tags_after(token);
+        _lsp_task_update_tags_after(j_id);
     }
 
-    cJSON_Delete(token);
-}
+    cJSON_Delete(j_id);
 
-static void _lsp_task_after_update_tags(lsp_work_t* req, int status)
-{
-    (void)status;
-
-    lsp_work_task_t* task = container_of(req, lsp_work_task_t, token);
-
-    free(task->workspace);
-    task->workspace = NULL;
-
-    free(task);
+    lsp_free(task);
 }
 
 void lsp_task_update_tags(const char* workspace)
 {
-    lsp_work_task_t* task = malloc(sizeof(lsp_work_task_t));
-    if (task == NULL)
-    {
-        fprintf(stderr, "out of memory.\n");
-        abort();
-    }
-    if ((task->workspace = strdup(workspace)) == NULL)
-    {
-        fprintf(stderr, "out of memory.\n");
-        abort();
-    }
+    lsp_work_task_t* task = lsp_malloc(sizeof(lsp_work_task_t));
+    task->workspace = lsp_strdup(workspace);
 
-    lsp_queue_work(&task->token, LSP_WORK_TASK,
-        _lsp_task_on_update_tags, _lsp_task_after_update_tags);
+    lsp_queue_work(&task->token, _lsp_task_on_update_tags, task);
 }

@@ -24,3 +24,9 @@ void tag_lsp_cleanup_client_capabilities(void)
         g_tags.client_capabilities = NULL;
     }
 }
+
+void lsp_want_exit(void)
+{
+    g_tags.flags.shutdown = 1;
+    uv_stop(g_tags.loop);
+}

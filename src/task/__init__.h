@@ -8,12 +8,6 @@
 extern "C" {
 #endif
 
-typedef struct lsp_work_task
-{
-    lsp_work_t  token;
-    char*       workspace;
-} lsp_work_task_t;
-
 /**
  * @brief Update tags.
  * @param[in] workspace Workspace folder.

@@ -49,6 +49,7 @@ typedef struct workspace_folder
 typedef struct tags_ctx_s
 {
     uv_loop_t*                  loop;                   /**< Event loop. */
+    uv_signal_t*                sigint;
     lsp_parser_t*               parser;                 /**< parser for language server protocol. */
 
     workspace_folder_t*         workspace_folders;      /**< Workspace folders list. */
@@ -80,6 +81,8 @@ typedef struct tags_ctx_s
 } tags_ctx_t;
 
 extern tags_ctx_t               g_tags;                 /**< Global runtime. */
+
+void lsp_want_exit(void);
 
 void tag_lsp_cleanup_workspace_folders(void);
 void tag_lsp_cleanup_client_capabilities(void);
