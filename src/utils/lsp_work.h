@@ -16,7 +16,14 @@ typedef int (*lsp_foreach_cb)(lsp_work_t* work, void* arg);
 
 typedef enum lsp_work_type
 {
+    /**
+     * @brief LSP request or Notification call.
+     * @see #tag_lsp_work_method_t.
+     */
     LSP_WORK_METHOD,
+
+
+    LSP_WORK_TASK,
 } lsp_work_type_t;
 
 struct lsp_work

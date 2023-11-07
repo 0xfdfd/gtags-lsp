@@ -92,11 +92,11 @@ static int _handle_request(lsp_parser_t* parser, cJSON* msg)
 
     if (msg_type == LSP_MSG_RSP)
     {
-        tag_lsp_handle_rsp(msg);
+        lsp_handle_rsp(msg);
     }
     else
     {
-        tag_lsp_handle_req(msg, msg_type == LSP_MSG_NFY);
+        lsp_handle_req(msg, msg_type == LSP_MSG_NFY);
     }
 
     return 0;

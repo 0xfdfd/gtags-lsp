@@ -109,7 +109,119 @@ static void _lsp_msg_on_notifier_close(uv_handle_t* handle)
     s_msg_ctx = NULL;
 }
 
-static uint64_t _tag_lsp_get_new_id(void)
+static void _lsp_send_msg(cJSON* msg)
+{
+    lsp_msg_ele_t* stdout_req = malloc(sizeof(lsp_msg_ele_t));
+    if (stdout_req == NULL)
+    {
+        abort();
+    }
+
+    {
+        char* dat = cJSON_PrintUnformatted(msg);
+        unsigned int dat_sz = (unsigned int)strlen(dat);
+        stdout_req->bufs[1] = uv_buf_init(dat, dat_sz);
+    }
+
+    size_t header_sz = 100;
+    stdout_req->bufs[0].base = malloc(header_sz);
+
+    stdout_req->bufs[0].len = snprintf(stdout_req->bufs[0].base, header_sz,
+        "Content-Length:%lu\r\n"
+        "Content-Type:application/vscode-jsonrpc; charset=utf-8\r\n\r\n",
+        stdout_req->bufs[1].len);
+
+    uv_mutex_lock(&s_msg_ctx->msg_queue_mutex);
+    {
+        ev_list_push_back(&s_msg_ctx->msg_queue, &stdout_req->node);
+    }
+    uv_mutex_unlock(&s_msg_ctx->msg_queue_mutex);
+
+    uv_async_send(&s_msg_ctx->msg_queue_notifier);
+}
+
+/**
+ * @brief Create a response from request with error code.
+ * @param[in] req   Request message.
+ * @param[in] code  Error code.
+ * @param[in] data  Error data. This function take the ownership of \p data.
+ */
+static cJSON* _lsp_create_error_fomr_req(cJSON* req, int code, cJSON* data)
+{
+    cJSON* rsp = lsp_create_rsp(req);
+    lsp_set_error(rsp, code, data);
+    return rsp;
+}
+
+static int _lsp_msg_send_error(cJSON* req, int code)
+{
+    cJSON* rsp = _lsp_create_error_fomr_req(req, code, NULL);
+    _lsp_send_msg(rsp);
+    cJSON_Delete(rsp);
+    return 0;
+}
+
+static void _lsp_method_on_work(lsp_work_t* req)
+{
+    int ret = 0;
+    tag_lsp_work_method_t* work = container_of(req, tag_lsp_work_method_t, token);
+
+    /* Check whether it is a notify. */
+    if (!work->notify)
+    {
+        work->rsp = lsp_create_rsp(work->req);
+    }
+
+    /* Reject any request if we are shutdown. */
+    if (!work->notify && g_tags.flags.shutdown)
+    {
+        lsp_set_error(work->rsp, TAG_LSP_ERR_INVALID_REQUEST, NULL);
+        return;
+    }
+
+    /* Call method. */
+    ret = lsp_method_call(work->req, work->rsp, work->notify);
+    if (!work->notify && ret < 0)
+    {
+        lsp_set_error(work->rsp, ret, NULL);
+        return;
+    }
+    else if (!work->notify && ret == LSP_METHOD_ASYNC)
+    {
+        work->rsp = NULL;
+    }
+}
+
+static void _lsp_method_after_work(lsp_work_t* req, int status)
+{
+    tag_lsp_work_method_t* work = container_of(req, tag_lsp_work_method_t, token);
+
+    if (!work->notify)
+    {
+        if (status != 0)
+        {
+            _lsp_msg_send_error(work->req, TAG_LSP_ERR_REQUEST_CANCELLED);
+        }
+        else
+        {
+            lsp_send_rsp(work->rsp);
+        }
+    }
+
+    if (work->req != NULL)
+    {
+        cJSON_Delete(work->req);
+        work->req = NULL;
+    }
+    if (work->rsp != NULL)
+    {
+        cJSON_Delete(work->rsp);
+        work->rsp = NULL;
+    }
+    free(work);
+}
+
+uint64_t lsp_new_id(void)
 {
     uint64_t id;
     uv_mutex_lock(&s_msg_ctx->req_id_mutex);
@@ -169,7 +281,7 @@ lsp_msg_type_t lsp_msg_type(cJSON* msg)
     return LSP_MSG_REQ;
 }
 
-cJSON* tag_lsp_create_rsp_from_req(cJSON* req)
+cJSON* lsp_create_rsp(cJSON* req)
 {
     cJSON* rsp = cJSON_CreateObject();
 
@@ -184,16 +296,7 @@ cJSON* tag_lsp_create_rsp_from_req(cJSON* req)
     return rsp;
 }
 
-cJSON* tag_lsp_create_error_fomr_req(cJSON* req, int code, cJSON* data)
-{
-    cJSON* rsp = tag_lsp_create_rsp_from_req(req);
-
-    tag_lsp_set_error(rsp, code, data);
-
-    return rsp;
-}
-
-cJSON* tag_lsp_create_notify(const char* method, cJSON* params)
+cJSON* lsp_create_notify(const char* method, cJSON* params)
 {
     cJSON* msg = cJSON_CreateObject();
 
@@ -208,18 +311,23 @@ cJSON* tag_lsp_create_notify(const char* method, cJSON* params)
     return msg;
 }
 
-cJSON* tag_lsp_create_request(const char* method, cJSON* params)
+cJSON* lsp_create_req(const char* method, cJSON* params)
 {
     char buffer[32];
-    uint64_t id = _tag_lsp_get_new_id();
-    snprintf(buffer, sizeof(buffer), "%" PRIu64, id);
+    lsp_new_id_str(buffer, sizeof(buffer));
 
-    cJSON* req = tag_lsp_create_notify(method, params);
+    cJSON* req = lsp_create_notify(method, params);
     cJSON_AddStringToObject(req, "id", buffer);
     return req;
 }
 
-void tag_lsp_set_error(cJSON* rsp, int code, cJSON* data)
+void lsp_new_id_str(char* buffer, size_t size)
+{
+    uint64_t id = lsp_new_id();
+    snprintf(buffer, size, "%" PRIu64, id);
+}
+
+void lsp_set_error(cJSON* rsp, int code, cJSON* data)
 {
     cJSON* errobj = cJSON_CreateObject();
     cJSON_AddNumberToObject(errobj, "code", code);
@@ -233,108 +341,17 @@ void tag_lsp_set_error(cJSON* rsp, int code, cJSON* data)
     cJSON_AddItemToObject(rsp, "error", errobj);
 }
 
-int tag_lsp_send_rsp(cJSON* msg)
+void lsp_send_rsp(cJSON* msg)
 {
-    lsp_msg_ele_t* stdout_req = malloc(sizeof(lsp_msg_ele_t));
-    if (stdout_req == NULL)
-    {
-        abort();
-    }
-
-    {
-        char* dat = cJSON_PrintUnformatted(msg);
-        unsigned int dat_sz = (unsigned int)strlen(dat);
-        stdout_req->bufs[1] = uv_buf_init(dat, dat_sz);
-    }
-
-    size_t header_sz = 100;
-    stdout_req->bufs[0].base = malloc(header_sz);
-
-    stdout_req->bufs[0].len = snprintf(stdout_req->bufs[0].base, header_sz,
-        "Content-Length:%lu\r\n"
-        "Content-Type:application/vscode-jsonrpc; charset=utf-8\r\n\r\n",
-        stdout_req->bufs[1].len);
-
-    uv_mutex_lock(&s_msg_ctx->msg_queue_mutex);
-    {
-        ev_list_push_back(&s_msg_ctx->msg_queue, &stdout_req->node);
-    }
-    uv_mutex_unlock(&s_msg_ctx->msg_queue_mutex);
-
-    uv_async_send(&s_msg_ctx->msg_queue_notifier);
-
-    return 0;
+    _lsp_send_msg(msg);
 }
 
-int tag_lsp_send_error(cJSON* req, int code)
+void lsp_send_notify(cJSON* msg)
 {
-    cJSON* rsp = tag_lsp_create_error_fomr_req(req, code, NULL);
-    tag_lsp_send_rsp(rsp);
-    cJSON_Delete(rsp);
-    return 0;
+    _lsp_send_msg(msg);
 }
 
-static void _lsp_method_on_work(lsp_work_t* req)
-{
-    int ret = 0;
-    tag_lsp_work_method_t* work = container_of(req, tag_lsp_work_method_t, token);
-
-    /* Check whether it is a notify. */
-    if (!work->notify)
-    {
-        work->rsp = tag_lsp_create_rsp_from_req(work->req);
-    }
-
-    /* Reject any request if we are shutdown. */
-    if (!work->notify && g_tags.flags.shutdown)
-    {
-        tag_lsp_set_error(work->rsp, TAG_LSP_ERR_INVALID_REQUEST, NULL);
-        return;
-    }
-
-    /* Call method. */
-    ret = lsp_method_call(work->req, work->rsp, work->notify);
-    if (!work->notify && ret < 0)
-    {
-        tag_lsp_set_error(work->rsp, ret, NULL);
-        return;
-    }
-    else if (!work->notify && ret == LSP_METHOD_ASYNC)
-    {
-        work->rsp = NULL;
-    }
-}
-
-static void _lsp_method_after_work(lsp_work_t* req, int status)
-{
-    tag_lsp_work_method_t* work = container_of(req, tag_lsp_work_method_t, token);
-
-    if (!work->notify)
-    {
-        if (status != 0)
-        {
-            tag_lsp_send_error(work->req, TAG_LSP_ERR_REQUEST_CANCELLED);
-        }
-        else
-        {
-            tag_lsp_send_rsp(work->rsp);
-        }
-    }
-
-    if (work->req != NULL)
-    {
-        cJSON_Delete(work->req);
-        work->req = NULL;
-    }
-    if (work->rsp != NULL)
-    {
-        cJSON_Delete(work->rsp);
-        work->rsp = NULL;
-    }
-    free(work);
-}
-
-void tag_lsp_handle_req(cJSON* req, int is_notify)
+void lsp_handle_req(cJSON* req, int is_notify)
 {
     tag_lsp_work_method_t* work = malloc(sizeof(tag_lsp_work_method_t));
     if (work == NULL)
@@ -350,7 +367,7 @@ void tag_lsp_handle_req(cJSON* req, int is_notify)
     lsp_queue_work(&work->token, LSP_WORK_METHOD, _lsp_method_on_work, _lsp_method_after_work);
 }
 
-void tag_lsp_handle_rsp(cJSON* rsp)
+void lsp_handle_rsp(cJSON* rsp)
 {
     ev_list_node_t* it;
     cJSON* j_id = cJSON_GetObjectItem(rsp, "id");
@@ -373,7 +390,7 @@ void tag_lsp_handle_rsp(cJSON* rsp)
     uv_mutex_unlock(&s_msg_ctx->req_queue_mutex);
 }
 
-cJSON* tag_lsp_send_req(cJSON* req)
+cJSON* lsp_send_req(cJSON* req)
 {
     lsp_msg_req_t msg_req;
     msg_req.req = req;
@@ -386,7 +403,7 @@ cJSON* tag_lsp_send_req(cJSON* req)
     }
     uv_mutex_unlock(&s_msg_ctx->req_queue_mutex);
 
-    tag_lsp_send_rsp(req);
+    _lsp_send_msg(req);
 
     uv_sem_wait(&msg_req.sem);
 

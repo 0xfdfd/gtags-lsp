@@ -72,9 +72,9 @@ static void _log_post_lsp_log_message(tag_lsp_log_t* log)
     cJSON_AddNumberToObject(params, "type", log->type);
     cJSON_AddStringToObject(params, "message", buf);
 
-    cJSON* msg = tag_lsp_create_notify("window/logMessage", params);
+    cJSON* msg = lsp_create_notify("window/logMessage", params);
 
-    tag_lsp_send_rsp(msg);
+    lsp_send_rsp(msg);
     cJSON_Delete(msg);
 
     free(buf);

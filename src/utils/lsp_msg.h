@@ -36,29 +36,26 @@ void tag_lsp_msg_exit(void);
  */
 lsp_msg_type_t lsp_msg_type(cJSON* msg);
 
-cJSON* tag_lsp_create_rsp_from_req(cJSON* req);
+/**
+ * @brief Create request message.
+ * @param[in] method    Request method.
+ * @param[in] params    Request params. This function take the ownership of \p params.
+ */
+cJSON* lsp_create_req(const char* method, cJSON* params);
 
 /**
- * @brief Create a response from request with error code.
+ * @brief Create response.
  * @param[in] req   Request message.
- * @param[in] code  Error code.
- * @param[in] data  Error data. This function take the ownership of \p data.
+ * @return          Response message.
  */
-cJSON* tag_lsp_create_error_fomr_req(cJSON* req, int code, cJSON* data);
+cJSON* lsp_create_rsp(cJSON* req);
 
 /**
  * @brief Create notification message.
  * @param[in] method    Notification method.
  * @param[in] params    Notification params. This function take the ownership of \p params.
  */
-cJSON* tag_lsp_create_notify(const char* method, cJSON* params);
-
-/**
- * @brief Create request message.
- * @param[in] method    Request method.
- * @param[in] params    Request params. This function take the ownership of \p params.
- */
-cJSON* tag_lsp_create_request(const char* method, cJSON* params);
+cJSON* lsp_create_notify(const char* method, cJSON* params);
 
 /**
  * @brief Set error code for msg.
@@ -66,27 +63,43 @@ cJSON* tag_lsp_create_request(const char* method, cJSON* params);
  * @param[in] code  Error code.
  * @param[in] data  Error data. This function take the ownership of \p data.
  */
-void tag_lsp_set_error(cJSON* rsp, int code, cJSON* data);
-
-/**
- * @brief Send LSP response or notification message.
- * @note MT-Safe.
- * @param[in] msg   Message.
- * @return          Error code.
- */
-int tag_lsp_send_rsp(cJSON* msg);
-
-int tag_lsp_send_error(cJSON* req, int code);
-
-void tag_lsp_handle_req(cJSON* req, int is_notify);
-void tag_lsp_handle_rsp(cJSON* rsp);
+void lsp_set_error(cJSON* rsp, int code, cJSON* data);
 
 /**
  * @brief Send request and wait for response.
  * @param[in] req   Request message.
  * @return          Response message. User must take care of lifecycle.
  */
-cJSON* tag_lsp_send_req(cJSON* req);
+cJSON* lsp_send_req(cJSON* req);
+
+/**
+ * @brief Send LSP response message.
+ * @note MT-Safe.
+ * @param[in] msg   Message.
+ */
+void lsp_send_rsp(cJSON* msg);
+
+/**
+ * @brief Send LSP notification message.
+ * @note MT-Safe.
+ * @param[in] msg   Message.
+ */
+void lsp_send_notify(cJSON* msg);
+
+void lsp_handle_req(cJSON* req, int is_notify);
+void lsp_handle_rsp(cJSON* rsp);
+
+/**
+ * @brief Generate a new id.
+ * This id can be used as message id, token, or other usage.
+ * @return          A new id.
+ */
+uint64_t lsp_new_id(void);
+
+/**
+ * @see lsp_new_id
+ */
+void lsp_new_id_str(char* buffer, size_t size);
 
 #ifdef __cplusplus
 }

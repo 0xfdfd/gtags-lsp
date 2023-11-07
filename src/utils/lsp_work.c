@@ -47,7 +47,10 @@ static void _lsp_on_after_work(uv_work_t* req, int status)
     }
     uv_mutex_unlock(&s_work_ctx->work_queue_mutex);
 
-    work->after_work_cb(work, status);
+    if (work->after_work_cb != NULL)
+    {
+        work->after_work_cb(work, status);
+    }
 }
 
 static void _lsp_on_work_queue(uv_async_t* handle)

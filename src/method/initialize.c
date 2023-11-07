@@ -4,6 +4,8 @@
 #include "runtime.h"
 #include "version.h"
 #include "utils/lsp_msg.h"
+#include "utils/execute.h"
+#include "task/__init__.h"
 
 #if defined(_WIN32)
 #   define strdup(s)    _strdup(s)
@@ -115,7 +117,7 @@ static void _lsp_method_init_generate_server_capabilities(cJSON* capabilities)
     }
 }
 
-static void _lsp_method_initialize_finished(cJSON* rsp)
+static void _lsp_method_initialize_generate_rsp(cJSON* rsp)
 {
     cJSON* InitializeResult = cJSON_CreateObject();
 
@@ -137,10 +139,37 @@ static void _lsp_method_initialize_finished(cJSON* rsp)
     cJSON_AddItemToObject(rsp, "result", InitializeResult);
 }
 
+static int _lsp_method_init_check_gtags(void)
+{
+    char* args[] = { "gtags", "--version", NULL };
+    int ret = lsp_execute("gtags", args, NULL, NULL, NULL);
+
+    if (ret != 0)
+    {
+        return ret;
+    }
+
+    return 0;
+}
+
+static void _lsp_method_init_update_tags(void)
+{
+    size_t i;
+    for (i = 0; i < g_tags.workspace_folder_sz; i++)
+    {
+        lsp_task_update_tags(g_tags.workspace_folders[i].uri);
+    }
+}
+
 static int _lsp_method_initialize(cJSON* req, cJSON* rsp)
 {
     int ret;
     cJSON* params = cJSON_GetObjectItem(req, "params");
+
+    if ((ret = _lsp_method_init_check_gtags()) != 0)
+    {
+        goto error;
+    }
 
     if ((ret = _lsp_method_init_workspace_folders(params)) != 0)
     {
@@ -152,14 +181,16 @@ static int _lsp_method_initialize(cJSON* req, cJSON* rsp)
         goto error;
     }
 
-    _lsp_method_initialize_finished(rsp);
+    _lsp_method_initialize_generate_rsp(rsp);
+    _lsp_method_init_update_tags();
+
     return 0;
 
 error:
     {
         cJSON* err_dat = cJSON_CreateObject();
         cJSON_AddBoolToObject(err_dat, "retry", 0);
-        tag_lsp_set_error(rsp, ret, err_dat);
+        lsp_set_error(rsp, ret, err_dat);
     }
 
     return 0;
