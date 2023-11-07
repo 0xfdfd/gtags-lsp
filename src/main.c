@@ -248,6 +248,10 @@ static void _show_welecome(void)
 
 int main(int argc, char* argv[])
 {
+#if defined(SIGPIPE)
+    signal(SIGPIPE, SIG_IGN);
+#endif
+
     /* Register global cleanup hook. */
     atexit(_at_exit);
 
