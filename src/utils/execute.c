@@ -4,6 +4,7 @@
 #include "execute.h"
 #include "lsp_error.h"
 #include "utils/alloc.h"
+#include "utils/log.h"
 #include "defines.h"
 
 typedef struct tag_lsp_execute_ctx
@@ -48,11 +49,13 @@ int lsp_execute(const char* file, char** args, const char* cwd,
 
     if ((ret = uv_loop_init(&exe_ctx.loop)) != 0)
     {
+        LSP_LOG(LSP_MSG_ERROR, "init event loop failed.");
         abort();
     }
 
     if ((ret = uv_pipe_init(&exe_ctx.loop, &exe_ctx.pip_stdout, 0)) != 0)
     {
+        LSP_LOG(LSP_MSG_ERROR, "init pipe failed.");
         abort();
     }
 
@@ -63,7 +66,7 @@ int lsp_execute(const char* file, char** args, const char* cwd,
     exe_ctx.option.flags = UV_PROCESS_WINDOWS_HIDE;
     exe_ctx.option.stdio_count = 3;
     exe_ctx.option.stdio = exe_ctx.container;
-    exe_ctx.container[1].flags = UV_CREATE_PIPE | UV_READABLE_PIPE;
+    exe_ctx.container[1].flags = UV_CREATE_PIPE | UV_WRITABLE_PIPE;
     exe_ctx.container[1].data.stream = (uv_stream_t*)&exe_ctx.pip_stdout;
 
     ret = uv_spawn(&exe_ctx.loop, &exe_ctx.process, &exe_ctx.option);
@@ -76,6 +79,8 @@ int lsp_execute(const char* file, char** args, const char* cwd,
     ret = uv_read_start((uv_stream_t*)&exe_ctx.pip_stdout, tag_lsp_alloc, _tag_lsp_on_stdout);
     if (ret != 0)
     {
+        LSP_LOG(LSP_MSG_ERROR, "read from child process stdout failed: %s (%d).",
+            uv_strerror(ret), ret);
         abort();
     }
 
@@ -83,9 +88,11 @@ int lsp_execute(const char* file, char** args, const char* cwd,
 
 finish:
     uv_close((uv_handle_t*)&exe_ctx.pip_stdout, NULL);
+    uv_close((uv_handle_t*)&exe_ctx.process, NULL);
     uv_run(&exe_ctx.loop, UV_RUN_DEFAULT);
     if ((ret = uv_loop_close(&exe_ctx.loop)) != 0)
     {
+        LSP_LOG(LSP_MSG_ERROR, "close loop failed.");
         abort();
     }
     return ret;

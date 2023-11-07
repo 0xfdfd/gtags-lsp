@@ -148,10 +148,7 @@ static void _on_log_queue(uv_async_t* handle)
     lsp_log_t* log;
     while ((log = _pop_log_from_queue()) != NULL)
     {
-        log->file = _log_filename(log->file);
-
         _log_post_lsp_log_message(log);
-        _log_post_file_log_message(log);
 
         free(log);
     }
@@ -295,13 +292,16 @@ void lsp_log(lsp_trace_message_type_t type, const char* file, const char* func,
     }
 
     msg->type = type;
-    msg->file = file;
+    msg->file = _log_filename(file);
     msg->func = func;
     msg->line = line;
     msg->message = (char*)(msg + 1);
 
     vsnprintf(msg->message, msg_len + 1, fmt, ap_bak);
     va_end(ap_bak);
+
+    /* Direct write to file so that no log lost. */
+    _log_post_file_log_message(msg);
 
     uv_mutex_lock(&s_log_ctx->log_queue_mutex);
     {

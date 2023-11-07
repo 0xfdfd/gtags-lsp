@@ -143,7 +143,7 @@ static void _lsp_method_initialize_generate_rsp(cJSON* rsp)
 static void _lsp_method_gtags_version(const char* data, size_t size, void* arg)
 {
     (void)size; (void)arg;
-    LSP_LOG(LSP_MSG_DEBUG, "gtags version: %s", data);
+    LSP_LOG(LSP_MSG_DEBUG, "gtags information:\n%s", data);
 }
 
 static int _lsp_method_init_check_gtags(void)
