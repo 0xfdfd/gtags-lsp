@@ -59,6 +59,7 @@ typedef struct tags_ctx_s
     struct 
     {
         char*                   logdir;                 /**< The directory to store log. */
+        char*                   logfile;                /**< The log file path. */
     } config;
 
     struct

@@ -7,6 +7,7 @@
 #include "utils/io.h"
 #include "utils/log.h"
 #include "utils/lsp_work.h"
+#include "utils/alloc.h"
 #include "runtime.h"
 
 #if defined(WIN32)
@@ -20,17 +21,22 @@ static const char* s_help =
 "\n"
 "OPTIONS:\n"
 "  --stdio\n"
-"    Uses stdio as the communication channel. If no option specific, use this as\n"
-"    default option.\n"
+"    Uses stdio as the communication channel. If no option specific, use this\n"
+"    as default option.\n"
 "\n"
 "  --pipe=[FILE]\n"
-"    Use pipes (Windows) or socket files (Linux, Mac) as the communication channel.\n"
+"    Use pipes (Windows) or socket files (Linux, Mac) as the communication\n"
+"    channel.\n"
 "\n"
 "  --port=[NUMBER]\n"
 "    Uses a socket as the communication channel.\n"
 "\n"
 "  --logdir=[PATH]\n"
-"    The directory to store log.\n"
+"    The directory to store log. The logfile will be like tags-lsp.pid.log\n"
+"\n"
+"  --logfile=[PATH]\n"
+"    The log file path. If both `--logdir` and `--logfile` exist, `--logfile`\n"
+"    win.\n"
 "\n"
 "  -h, --help\n"
 "    Show this help and exit.\n";
@@ -84,8 +90,14 @@ static void _at_exit_stage_2(void)
 
     if (g_tags.config.logdir != NULL)
     {
-        free(g_tags.config.logdir);
+        lsp_free(g_tags.config.logdir);
         g_tags.config.logdir = NULL;
+    }
+
+    if (g_tags.config.logfile != NULL)
+    {
+        lsp_free(g_tags.config.logfile);
+        g_tags.config.logfile = NULL;
     }
 
     tag_lsp_cleanup_workspace_folders();
@@ -103,11 +115,19 @@ static void _at_exit(void)
     uv_library_shutdown();
 }
 
-static int _handle_request(lsp_parser_t* parser, cJSON* msg)
+static int _handle_request(cJSON* msg, void* arg)
 {
-    (void)parser;
+    (void)arg;
 
     lsp_msg_type_t msg_type = lsp_msg_type(msg);
+
+#if 0
+    {
+        char* buf = cJSON_PrintUnformatted(msg);
+        LSP_LOG(LSP_MSG_DEBUG, "incoming --> %s", buf);
+        cJSON_free(buf);
+    }
+#endif
 
     if (msg_type == LSP_MSG_RSP)
     {
@@ -132,15 +152,14 @@ static void _on_io_in(const char* data, ssize_t size)
     lsp_parser_execute(g_tags.parser, data, size);
 }
 
-static void _setup_io_or_help(char* argv[])
+static void _setup_io_or_help(tag_lsp_io_cfg_t* io_cfg, char* argv[])
 {
     size_t i;
     int ret = 0;
     const char* opt = NULL;
 
-    tag_lsp_io_cfg_t io_cfg;
-    memset(&io_cfg, 0, sizeof(io_cfg));
-    io_cfg.cb = _on_io_in;
+    io_cfg->type = TAG_LSP_IO_STDIO;
+    io_cfg->cb = _on_io_in;
 
     for (i = 0; argv[i] != NULL; i++)
     {
@@ -152,8 +171,7 @@ static void _setup_io_or_help(char* argv[])
 
         if (strcmp(argv[i], "--stdio") == 0)
         {
-            io_cfg.type = TAG_LSP_IO_STDIO;
-            tag_lsp_io_init(&io_cfg);
+            io_cfg->type = TAG_LSP_IO_STDIO;
             continue;
         }
 
@@ -161,9 +179,8 @@ static void _setup_io_or_help(char* argv[])
         if (strncmp(argv[i], opt, strlen(opt)) == 0)
         {
             opt = argv[i] + strlen(opt);
-            io_cfg.type = TAG_LSP_IO_PIPE;
-            io_cfg.data.file = opt;
-            tag_lsp_io_init(&io_cfg);
+            io_cfg->type = TAG_LSP_IO_PIPE;
+            io_cfg->data.file = opt;
             continue;
         }
 
@@ -176,9 +193,8 @@ static void _setup_io_or_help(char* argv[])
                 fprintf(stderr, "invalid value for `--port`: %s.\n", opt);
                 exit(EXIT_FAILURE);
             }
-            io_cfg.type = TAG_LSP_IO_PORT;
-            io_cfg.data.port = ret;
-            tag_lsp_io_init(&io_cfg);
+            io_cfg->type = TAG_LSP_IO_PORT;
+            io_cfg->data.port = ret;
             continue;
         }
 
@@ -190,7 +206,19 @@ static void _setup_io_or_help(char* argv[])
             {
                 free(g_tags.config.logdir);
             }
-            g_tags.config.logdir = strdup(opt);
+            g_tags.config.logdir = lsp_strdup(opt);
+            continue;
+        }
+
+        opt = "--logfile=";
+        if (strncmp(argv[i], opt, strlen(opt)) == 0)
+        {
+            opt = argv[i] + strlen(opt);
+            if (g_tags.config.logfile != NULL)
+            {
+                lsp_free(g_tags.config.logfile);
+            }
+            g_tags.config.logfile = lsp_strdup(opt);
             continue;
         }
     }
@@ -208,13 +236,19 @@ static char** _initialize(int argc, char* argv[])
         abort();
     }
 
-    _setup_io_or_help(argv);
+    tag_lsp_io_cfg_t io_cfg;
+    _setup_io_or_help(&io_cfg, argv);
+
+    /* Initialize log system. */
+    lsp_log_init();
+
+    /* Initialize IO layer. */
+    tag_lsp_io_init(&io_cfg);
 
     tag_lsp_msg_init();
-    lsp_log_init();
     lsp_work_init();
 
-    g_tags.parser = lsp_parser_create(_handle_request);
+    g_tags.parser = lsp_parser_create(_handle_request, NULL);
 
     return argv;
 }

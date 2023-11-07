@@ -190,14 +190,8 @@ static int fopen_s(FILE** stream, const char* path, const char* mode)
 }
 #endif
 
-static void _lsp_log_init_logfile(void)
+static void _lsp_log_init_logfile_from_logdir(void)
 {
-    if (g_tags.config.logdir == NULL)
-    {
-        s_log_ctx->logfile = NULL;
-        return;
-    }
-
 	uv_pid_t pid = uv_os_getpid();
 
 	char pid_buf[32];
@@ -206,11 +200,11 @@ static void _lsp_log_init_logfile(void)
 	// logdir/tag-lsp.pid.log
 	size_t path_sz = strlen(g_tags.config.logdir) + strlen(pid_buf) + 14;
 	char* path = malloc(path_sz);
-    if (path == NULL)
-    {
-        fprintf(stderr, "out of memory.\n");
-        abort();
-    }
+	if (path == NULL)
+	{
+		fprintf(stderr, "out of memory.\n");
+		abort();
+	}
 	snprintf(path, path_sz, "%s/tag-lsp.%s.log", g_tags.config.logdir, pid_buf);
 
 	if (fopen_s(&s_log_ctx->logfile, path, "ab") != 0)
@@ -221,7 +215,32 @@ static void _lsp_log_init_logfile(void)
 	}
 
 	free(path);
-    path = NULL;
+	path = NULL;
+}
+
+static void _lsp_log_init_logfile_direct(void)
+{
+    if (fopen_s(&s_log_ctx->logfile, g_tags.config.logfile, "wb") != 0)
+    {
+        fprintf(stderr, "open logfile `%s` failed.\n", g_tags.config.logfile);
+        exit(EXIT_FAILURE);
+    }
+}
+
+static void _lsp_log_init_logfile(void)
+{
+    if (g_tags.config.logfile != NULL)
+    {
+        _lsp_log_init_logfile_direct();
+    }
+    else if (g_tags.config.logdir != NULL)
+    {
+        _lsp_log_init_logfile_from_logdir();
+    }
+    else
+    {
+        s_log_ctx->logfile = NULL;
+    }
 }
 
 void lsp_log_init(void)

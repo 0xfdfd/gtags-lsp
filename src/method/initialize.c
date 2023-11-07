@@ -6,6 +6,7 @@
 #include "utils/lsp_msg.h"
 #include "utils/execute.h"
 #include "task/__init__.h"
+#include "utils/log.h"
 
 #if defined(_WIN32)
 #   define strdup(s)    _strdup(s)
@@ -139,10 +140,16 @@ static void _lsp_method_initialize_generate_rsp(cJSON* rsp)
     cJSON_AddItemToObject(rsp, "result", InitializeResult);
 }
 
+static void _lsp_method_gtags_version(const char* data, size_t size, void* arg)
+{
+    (void)size; (void)arg;
+    LSP_LOG(LSP_MSG_DEBUG, "gtags version: %s", data);
+}
+
 static int _lsp_method_init_check_gtags(void)
 {
     char* args[] = { "gtags", "--version", NULL };
-    int ret = lsp_execute("gtags", args, NULL, NULL, NULL);
+    int ret = lsp_execute("gtags", args, NULL, _lsp_method_gtags_version, NULL);
 
     if (ret != 0)
     {

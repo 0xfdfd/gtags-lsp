@@ -14,7 +14,7 @@ typedef struct tag_lsp_execute_ctx
     uv_stdio_container_t        container[3];
     uv_pipe_t                   pip_stdout;
 
-    lsp_execute_stdout_cb   cb;
+    lsp_execute_stdout_cb       cb;
     void*                       arg;
 } tag_lsp_execute_ctx_t;
 
@@ -29,10 +29,11 @@ static void _tag_lsp_on_stdout(uv_stream_t* stream, ssize_t nread, const uv_buf_
 
     if (nread > 0 && exe_ctx->cb != NULL)
     {
+        buf->base[nread] = '\0';
         exe_ctx->cb(buf->base, nread, exe_ctx->arg);
     }
 
-    tag_lsp_free(buf->base);
+    lsp_free(buf->base);
 }
 
 int lsp_execute(const char* file, char** args, const char* cwd,

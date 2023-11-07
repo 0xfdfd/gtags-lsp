@@ -2,6 +2,7 @@
 #include "io.h"
 #include "runtime.h"
 #include "utils/alloc.h"
+#include "utils/log.h"
 
 #if !defined(WIN32)
 #   include <unistd.h>
@@ -40,28 +41,39 @@ static void _on_tty_stdin(uv_stream_t* stream, ssize_t nread, const uv_buf_t* bu
 {
     (void)stream;
 
+    if (nread >= 0)
+    {
+        buf->base[nread] = '\0';
+    }
+
     s_io_ctx->cb(buf->base, nread);
 
-    tag_lsp_free(buf->base);
+    lsp_free(buf->base);
 }
 
 static int _tag_lsp_init_io_as_stdio(tag_lsp_io_cfg_t* cfg)
 {
     (void)cfg;
 
+    int ret;
     s_io_ctx->backend.as_stdio.cnt_close = 0;
 
-    if (uv_tty_init(g_tags.loop, &s_io_ctx->backend.as_stdio.tty_in, STDIN_FILENO, 0) != 0)
+    ret = uv_tty_init(g_tags.loop, &s_io_ctx->backend.as_stdio.tty_in, STDIN_FILENO, 0);
+    if (ret != 0)
+    {
+        fprintf(stderr, "initialize tty_in failed: %s (%d): stdin fileno: %d\n",
+            uv_strerror(ret), ret, STDIN_FILENO);
+        abort();
+    }
+
+    ret = uv_tty_init(g_tags.loop, &s_io_ctx->backend.as_stdio.tty_out, STDOUT_FILENO, 0);
+    if (ret != 0)
     {
         abort();
     }
 
-    if (uv_tty_init(g_tags.loop, &s_io_ctx->backend.as_stdio.tty_out, STDOUT_FILENO, 0) != 0)
-    {
-        abort();
-    }
-
-    if (uv_read_start((uv_stream_t*)&s_io_ctx->backend.as_stdio.tty_in, tag_lsp_alloc, _on_tty_stdin) != 0)
+    ret = uv_read_start((uv_stream_t*)&s_io_ctx->backend.as_stdio.tty_in, tag_lsp_alloc, _on_tty_stdin);
+    if (ret != 0)
     {
         abort();
     }
@@ -162,14 +174,17 @@ void tag_lsp_io_init(tag_lsp_io_cfg_t* cfg)
     switch (cfg->type)
     {
     case TAG_LSP_IO_STDIO:
+        LSP_LOG(LSP_MSG_DEBUG, "initialize stdio.");
         _tag_lsp_init_io_as_stdio(cfg);
         return;
 
     case TAG_LSP_IO_PIPE:
+        LSP_LOG(LSP_MSG_DEBUG, "initialize pipe.");
         _tag_lsp_init_io_as_pipe(cfg);
         return;
 
     case TAG_LSP_IO_PORT:
+        LSP_LOG(LSP_MSG_DEBUG, "initialize socket.");
         _tag_lsp_init_io_as_socket(cfg);
         return;
 

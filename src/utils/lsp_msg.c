@@ -8,6 +8,7 @@
 #include "utils/list.h"
 #include "utils/lsp_error.h"
 #include "utils/io.h"
+#include "utils/log.h"
 
 typedef struct lsp_msg_ele
 {
