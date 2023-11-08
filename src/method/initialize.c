@@ -7,19 +7,16 @@
 #include "utils/execute.h"
 #include "task/__init__.h"
 #include "utils/log.h"
-
-#if defined(_WIN32)
-#   define strdup(s)    _strdup(s)
-#endif
+#include "utils/alloc.h"
 
 static void _lsp_method_initialize_set_one_workspace_folder(const char* path)
 {
     tag_lsp_cleanup_workspace_folders();
 
     g_tags.workspace_folder_sz = 1;
-    g_tags.workspace_folders = malloc(sizeof(workspace_folder_t));
-    g_tags.workspace_folders[0].name = strdup("");
-    g_tags.workspace_folders[0].uri = strdup(path);
+    g_tags.workspace_folders = lsp_malloc(sizeof(workspace_folder_t));
+    g_tags.workspace_folders[0].name = lsp_strdup("");
+    g_tags.workspace_folders[0].uri = lsp_strdup(path);
 }
 
 static int _lsp_method_init_workspace_folders(cJSON* params)
@@ -59,17 +56,13 @@ static int _lsp_method_init_workspace_folders(cJSON* params)
             const char* uri = cJSON_GetStringValue(json_uri);
 
             size_t new_sz = g_tags.workspace_folder_sz + 1;
-            workspace_folder_t* new_folder = realloc(g_tags.workspace_folders, sizeof(workspace_folder_t) * new_sz);
-            if (new_folder == NULL)
-            {
-                abort();
-            }
+            workspace_folder_t* new_folder = lsp_realloc(g_tags.workspace_folders, sizeof(workspace_folder_t) * new_sz);
 
             g_tags.workspace_folders = new_folder;
             g_tags.workspace_folder_sz = new_sz;
 
-            g_tags.workspace_folders[g_tags.workspace_folder_sz - 1].name = strdup(name);
-            g_tags.workspace_folders[g_tags.workspace_folder_sz - 1].uri = strdup(uri);
+            g_tags.workspace_folders[g_tags.workspace_folder_sz - 1].name = lsp_strdup(name);
+            g_tags.workspace_folders[g_tags.workspace_folder_sz - 1].uri = lsp_strdup(uri);
         }
     }
 

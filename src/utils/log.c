@@ -161,7 +161,7 @@ static void _tag_lsp_on_log_exit(uv_handle_t* handle)
     lsp_log_t* log;
     while ((log = _pop_log_from_queue()) != NULL)
     {
-        free(log);
+        lsp_free(log);
     }
 
     if (s_log_ctx->logfile != NULL)
@@ -173,7 +173,7 @@ static void _tag_lsp_on_log_exit(uv_handle_t* handle)
     uv_mutex_destroy(&s_log_ctx->log_queue_mutex);
     uv_mutex_destroy(&s_log_ctx->logfile_mutex);
 
-    free(s_log_ctx);
+    lsp_free(s_log_ctx);
     s_log_ctx = NULL;
 }
 

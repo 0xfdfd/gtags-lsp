@@ -76,10 +76,12 @@ static void _at_exit_stage_1(void)
 {
     tag_lsp_msg_exit();
     tag_lsp_io_exit();
-    lsp_log_exit();
     lsp_work_exit();
 
+    lsp_log_exit();
+
     uv_close((uv_handle_t*)g_tags.sigint, NULL);
+    uv_close((uv_handle_t*)g_tags.exit_notifier, NULL);
 }
 
 static void _at_exit_stage_2(void)
@@ -106,6 +108,12 @@ static void _at_exit_stage_2(void)
     {
         lsp_free(g_tags.sigint);
         g_tags.sigint = NULL;
+    }
+
+    if (g_tags.exit_notifier != NULL)
+    {
+        lsp_free(g_tags.exit_notifier);
+        g_tags.exit_notifier = NULL;
     }
 
     tag_lsp_cleanup_workspace_folders();
@@ -235,7 +243,7 @@ static void _parser_command_line_options(tag_lsp_io_cfg_t* io_cfg, char* argv[])
 static void _on_signal(uv_signal_t* handle, int signum)
 {
     (void)handle; (void)signum;
-    lsp_want_exit();
+    lsp_exit();
 }
 
 static void _signal_sigint_init()
@@ -258,6 +266,18 @@ static void _show_welecome(void)
         (int64_t)uv_os_getpid(), (int64_t)uv_os_getppid());
 }
 
+static void _on_exit_notify(uv_async_t* handle)
+{
+    (void)handle;
+    uv_stop(g_tags.loop);
+}
+
+static void _init_exit_notifier(void)
+{
+    g_tags.exit_notifier = lsp_malloc(sizeof(uv_async_t));
+    uv_async_init(g_tags.loop, g_tags.exit_notifier, _on_exit_notify);
+}
+
 static char** _initialize(int argc, char* argv[])
 {
     argv = uv_setup_args(argc, argv);
@@ -275,6 +295,8 @@ static char** _initialize(int argc, char* argv[])
 
     /* Initialize sigint handler. */
     _signal_sigint_init();
+
+    _init_exit_notifier();
 
     tag_lsp_io_cfg_t io_cfg;
     _parser_command_line_options(&io_cfg, argv);

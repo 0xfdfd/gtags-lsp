@@ -222,7 +222,10 @@ static void _tag_lsp_on_stdio_close(uv_handle_t* handle)
 
 static void _tag_lsp_io_exit_as_stdio(void)
 {
+    LSP_LOG(LSP_MSG_DEBUG, "close stdin.");
     uv_close((uv_handle_t*)&s_io_ctx->backend.as_stdio.tty_in, _tag_lsp_on_stdio_close);
+
+    LSP_LOG(LSP_MSG_DEBUG, "close stdout.");
     uv_close((uv_handle_t*)&s_io_ctx->backend.as_stdio.tty_out, _tag_lsp_on_stdio_close);
 }
 

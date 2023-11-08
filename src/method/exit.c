@@ -5,7 +5,7 @@ static int _lsp_method_exit(cJSON* req, cJSON* rsp)
 {
     (void)req; (void)rsp;
 
-    uv_stop(g_tags.loop);
+    lsp_exit();
 
     return 0;
 }

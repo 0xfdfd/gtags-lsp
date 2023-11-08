@@ -108,7 +108,7 @@ static void _on_tty_stdout(uv_write_t* req, int status)
 
 	if (status != 0)
 	{
-        lsp_want_exit();
+        lsp_exit();
 		LSP_LOG(LSP_MSG_INFO, "write io failed: %s(%d).",
 			uv_strerror(status), status);
 		return;
@@ -124,8 +124,7 @@ static void _lsp_msg_on_notify(uv_async_t* handle)
 
     while ((rsp = _lsp_msg_get_one()) != NULL)
     {
-        LSP_LOG(LSP_MSG_DEBUG, "outcoming -->\n%s%s",
-            rsp->bufs[0].base, rsp->bufs[1].base);
+        LSP_LOG(LSP_MSG_DEBUG, "outcoming -->\n%s", rsp->bufs[1].base);
 
         ret = tag_lsp_io_write(&rsp->req, rsp->bufs, 2, _on_tty_stdout);
         if (ret != 0)
