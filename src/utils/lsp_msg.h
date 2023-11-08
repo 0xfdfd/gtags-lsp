@@ -52,9 +52,10 @@ cJSON* lsp_create_notify(const char* method, cJSON* params);
  * @brief Set error code for msg.
  * @param[in] rsp   Message to set.
  * @param[in] code  Error code.
+ * @param[in] msg   Error message. If NULL, the string of error code will be used.
  * @param[in] data  Error data. This function take the ownership of \p data.
  */
-void lsp_set_error(cJSON* rsp, int code, cJSON* data);
+void lsp_set_error(cJSON* rsp, int code, const char* msg, cJSON* data);
 
 /**
  * @brief Send request and wait for response.

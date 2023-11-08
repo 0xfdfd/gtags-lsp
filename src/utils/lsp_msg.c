@@ -14,13 +14,13 @@
 typedef struct tag_lsp_work_method
 {
     ev_list_node_t              node;
-	lsp_work_t*                 token;                  /**< Work token. */
+    lsp_work_t*                 token;                  /**< Work token. */
 
-	cJSON*                      req;                    /**< LSP request. */
-	cJSON*                      rsp;                    /**< LSP response. `NULL` if #tag_lsp_work_t::notify is true. */
+    cJSON*                      req;                    /**< LSP request. */
+    cJSON*                      rsp;                    /**< LSP response. `NULL` if #tag_lsp_work_t::notify is true. */
 
-	int                         notify;                 /**< (Boolean) request is a notification. */
-	int                         cancel;                 /**< (Boolean) request can be cancel. */
+    int                         notify;                 /**< (Boolean) request is a notification. */
+    int                         cancel;                 /**< (Boolean) request can be cancel. */
 } tag_lsp_work_method_t;
 
 typedef struct lsp_msg_ele
@@ -106,13 +106,13 @@ static void _on_tty_stdout(uv_write_t* req, int status)
     lsp_msg_ele_t* impl = container_of(req, lsp_msg_ele_t, req);
     _runtime_release_send_buf(impl);
 
-	if (status != 0)
-	{
+    if (status != 0)
+    {
         lsp_exit();
-		LSP_LOG(LSP_MSG_INFO, "write io failed: %s(%d).",
-			uv_strerror(status), status);
-		return;
-	}
+        LSP_LOG(LSP_MSG_INFO, "write io failed: %s(%d).",
+            uv_strerror(status), status);
+        return;
+    }
 }
 
 static void _lsp_msg_on_notify(uv_async_t* handle)
@@ -184,16 +184,16 @@ static void _lsp_send_msg(cJSON* msg)
  * @param[in] code  Error code.
  * @param[in] data  Error data. This function take the ownership of \p data.
  */
-static cJSON* _lsp_create_error_fomr_req(cJSON* req, int code, cJSON* data)
+static cJSON* _lsp_create_error_fomr_req(cJSON* req, int code, const char* msg, cJSON* data)
 {
     cJSON* rsp = lsp_create_rsp(req);
-    lsp_set_error(rsp, code, data);
+    lsp_set_error(rsp, code, msg, data);
     return rsp;
 }
 
-static int _lsp_msg_send_error(cJSON* req, int code)
+static int _lsp_msg_send_error(cJSON* req, int code, const char* msg, cJSON* data)
 {
-    cJSON* rsp = _lsp_create_error_fomr_req(req, code, NULL);
+    cJSON* rsp = _lsp_create_error_fomr_req(req, code, msg, data);
     _lsp_send_msg(rsp);
     cJSON_Delete(rsp);
     return 0;
@@ -203,17 +203,18 @@ static void _lsp_method_on_normal_request(tag_lsp_work_method_t* work)
 {
     int ret = 0;
 
-	/* Call method. */
-	ret = lsp_method_call(work->req, work->rsp, work->notify);
-	if (!work->notify && ret < 0)
-	{
-		lsp_set_error(work->rsp, ret, NULL);
-		return;
-	}
-	else if (!work->notify && ret == LSP_METHOD_ASYNC)
-	{
-		work->rsp = NULL;
-	}
+    /* Call method. */
+    ret = lsp_method_call(work->req, work->rsp, work->notify);
+    if (!work->notify && ret < 0)
+    {
+        cJSON* method = cJSON_GetObjectItem(work->req, "method");
+        lsp_set_error(work->rsp, ret, cJSON_GetStringValue(method), NULL);
+        return;
+    }
+    else if (!work->notify && ret == LSP_METHOD_ASYNC)
+    {
+        work->rsp = NULL;
+    }
 }
 
 static void _lsp_method_on_work(lsp_work_t* token, int cancel, void* arg)
@@ -221,24 +222,25 @@ static void _lsp_method_on_work(lsp_work_t* token, int cancel, void* arg)
     (void)token;
     tag_lsp_work_method_t* work = arg;
 
-	/* Check whether it is a notify. */
-	if (!work->notify)
-	{
-		work->rsp = lsp_create_rsp(work->req);
-	}
+    /* Check whether it is a notify. */
+    if (!work->notify)
+    {
+        work->rsp = lsp_create_rsp(work->req);
+    }
 
-	/* Reject any request if we are shutdown. */
-	if (!work->notify && g_tags.flags.shutdown)
-	{
-		lsp_set_error(work->rsp, TAG_LSP_ERR_INVALID_REQUEST, NULL);
+    /* Reject any request if we are shutdown. */
+    if (!work->notify && g_tags.flags.shutdown)
+    {
+        lsp_set_error(work->rsp, TAG_LSP_ERR_INVALID_REQUEST, "server is shutdown", NULL);
         goto finish;
-	}
+    }
 
     if (cancel)
     {
         if (!work->notify)
         {
-            _lsp_msg_send_error(work->req, TAG_LSP_ERR_REQUEST_CANCELLED);
+            _lsp_msg_send_error(work->req, TAG_LSP_ERR_REQUEST_CANCELLED,
+                "request is cancelled by client", NULL);
         }
     }
     else
@@ -258,17 +260,17 @@ finish:
     }
     uv_mutex_unlock(&s_msg_ctx->in_req_queue_mutex);
 
-	if (work->req != NULL)
-	{
-		cJSON_Delete(work->req);
-		work->req = NULL;
-	}
-	if (work->rsp != NULL)
-	{
-		cJSON_Delete(work->rsp);
-		work->rsp = NULL;
-	}
-	lsp_free(work);
+    if (work->req != NULL)
+    {
+        cJSON_Delete(work->req);
+        work->req = NULL;
+    }
+    if (work->rsp != NULL)
+    {
+        cJSON_Delete(work->rsp);
+        work->rsp = NULL;
+    }
+    lsp_free(work);
 }
 
 static void _lsp_handle_req(cJSON* req, int is_notify)
@@ -437,11 +439,16 @@ void lsp_new_id_str(char* buffer, size_t size)
     snprintf(buffer, size, "%" PRIu64, id);
 }
 
-void lsp_set_error(cJSON* rsp, int code, cJSON* data)
+void lsp_set_error(cJSON* rsp, int code, const char* msg, cJSON* data)
 {
     cJSON* errobj = cJSON_CreateObject();
     cJSON_AddNumberToObject(errobj, "code", code);
-    cJSON_AddStringToObject(errobj, "message", lsp_strerror(code));
+
+    if (msg == NULL)
+    {
+        msg = lsp_strerror(code);
+    }
+    cJSON_AddStringToObject(errobj, "message", msg);
 
     if (data != NULL)
     {

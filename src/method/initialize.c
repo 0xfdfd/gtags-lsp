@@ -192,7 +192,7 @@ error:
     {
         cJSON* err_dat = cJSON_CreateObject();
         cJSON_AddBoolToObject(err_dat, "retry", 0);
-        lsp_set_error(rsp, ret, err_dat);
+        lsp_set_error(rsp, ret, NULL, err_dat);
     }
 
     return 0;
