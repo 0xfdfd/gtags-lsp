@@ -63,10 +63,6 @@ target_link_libraries(${PROJECT_NAME} PRIVATE libuv)
 include(third_party/cJSON.cmake)
 target_link_libraries(${PROJECT_NAME} PRIVATE cJSON)
 
-# llhttp
-include(third_party/llhttp.cmake)
-target_link_libraries(${PROJECT_NAME} PRIVATE llhttp)
-
 ###############################################################################
 # Test
 ###############################################################################
