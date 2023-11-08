@@ -13,14 +13,14 @@ ExternalProject_Add(3rd_cJSON
     SOURCE_DIR
         ${CJSON_SOURCE_PATH}
     CMAKE_ARGS
-        -DCMAKE_BUILD_TYPE=Release
+        -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
         -DCMAKE_INSTALL_PREFIX:PATH=${CJSON_INSTALL_PATH}
         -DENABLE_CJSON_TEST=OFF
         -DBUILD_SHARED_LIBS=OFF
     INSTALL_COMMAND
         ${CMAKE_COMMAND}
         --build .
-        --target install --config Release
+        --target install --config ${CMAKE_BUILD_TYPE}
     BUILD_BYPRODUCTS
         ${CJSON_LIB_PATH})
 

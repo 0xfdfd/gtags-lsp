@@ -15,7 +15,7 @@ ExternalProject_Add(3rd_libuv
     SOURCE_DIR
         ${LIBUV_SOURCE_PATH}
     CMAKE_ARGS
-        -DCMAKE_BUILD_TYPE=Release
+        -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
         -DCMAKE_INSTALL_PREFIX:PATH=${LIBUV_INSTALL_PATH}
         -DBUILD_SHARED_LIBS=OFF
         -DBUILD_TESTING=OFF
@@ -23,7 +23,7 @@ ExternalProject_Add(3rd_libuv
     INSTALL_COMMAND
         ${CMAKE_COMMAND}
         --build .
-        --target install --config Release
+        --target install --config ${CMAKE_BUILD_TYPE}
     BUILD_BYPRODUCTS
         ${LIBUV_LIB_PATH})
 
