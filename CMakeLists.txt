@@ -38,6 +38,7 @@ add_executable(${PROJECT_NAME}
     "src/utils/list.c"
     "src/utils/log.c"
     "src/utils/lsp_error.c"
+    "src/utils/lsp_file.c"
     "src/utils/lsp_msg.c"
     "src/utils/lsp_parser.c"
     "src/utils/lsp_work.c"

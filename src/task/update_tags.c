@@ -6,6 +6,7 @@
 #include "utils/lsp_msg.h"
 #include "utils/execute.h"
 #include "utils/alloc.h"
+#include "utils/log.h"
 
 typedef struct lsp_work_task
 {
@@ -123,7 +124,13 @@ static void _lsp_task_on_update_tags(lsp_work_t* token, int cancel, void* arg)
     }
 
     char* args[] = { "gtags", "-i", NULL };
-    lsp_execute("gtags", args, task->workspace, NULL, NULL);
+    int ret = lsp_execute("gtags", args, task->workspace, NULL, NULL);
+    if (ret != 0)
+    {
+        LSP_LOG(LSP_MSG_ERROR, "execute gtags failed: %s(%d).",
+            uv_strerror(ret), ret);
+        abort();
+    }
 
     if (support)
     {

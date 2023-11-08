@@ -8,6 +8,7 @@
 #include "task/__init__.h"
 #include "utils/log.h"
 #include "utils/alloc.h"
+#include "utils/lsp_file.h"
 
 static void _lsp_method_initialize_set_one_workspace_folder(const char* path)
 {
@@ -16,7 +17,7 @@ static void _lsp_method_initialize_set_one_workspace_folder(const char* path)
     g_tags.workspace_folder_sz = 1;
     g_tags.workspace_folders = lsp_malloc(sizeof(workspace_folder_t));
     g_tags.workspace_folders[0].name = lsp_strdup("");
-    g_tags.workspace_folders[0].uri = lsp_strdup(path);
+    g_tags.workspace_folders[0].uri = lsp_file_uri_to_real(path);
 }
 
 static int _lsp_method_init_workspace_folders(cJSON* params)
@@ -62,7 +63,7 @@ static int _lsp_method_init_workspace_folders(cJSON* params)
             g_tags.workspace_folder_sz = new_sz;
 
             g_tags.workspace_folders[g_tags.workspace_folder_sz - 1].name = lsp_strdup(name);
-            g_tags.workspace_folders[g_tags.workspace_folder_sz - 1].uri = lsp_strdup(uri);
+            g_tags.workspace_folders[g_tags.workspace_folder_sz - 1].uri = lsp_file_uri_to_real(uri);
         }
     }
 

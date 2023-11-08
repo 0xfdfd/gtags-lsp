@@ -72,7 +72,6 @@ int lsp_execute(const char* file, char** args, const char* cwd,
     ret = uv_spawn(&exe_ctx.loop, &exe_ctx.process, &exe_ctx.option);
     if (ret != 0)
     {
-        ret = TAG_LSP_ERR_REQUEST_FAILED;
         goto finish;
     }
 
@@ -90,7 +89,7 @@ finish:
     uv_close((uv_handle_t*)&exe_ctx.pip_stdout, NULL);
     uv_close((uv_handle_t*)&exe_ctx.process, NULL);
     uv_run(&exe_ctx.loop, UV_RUN_DEFAULT);
-    if ((ret = uv_loop_close(&exe_ctx.loop)) != 0)
+    if (uv_loop_close(&exe_ctx.loop) != 0)
     {
         LSP_LOG(LSP_MSG_ERROR, "close loop failed.");
         abort();

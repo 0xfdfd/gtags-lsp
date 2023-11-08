@@ -22,7 +22,7 @@ typedef void (*lsp_execute_stdout_cb)(const char* data, size_t size, void* arg);
  * @param[in] cwd               Working directory.
  * @param[in] cb                Stdout callback.
  * @param[in] arg               User defined argument pass to \p cb.
- * @return                      0 if success, otherwise failed.
+ * @return                      #UV_ERRNO_MAP
  */
 int lsp_execute(const char* file, char** args, const char* cwd,
     lsp_execute_stdout_cb cb, void* arg);
