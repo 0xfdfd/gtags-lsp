@@ -247,7 +247,7 @@ static void _lsp_method_on_work(lsp_work_t* token, int cancel, void* arg)
     }
 
 finish:
-    if (!work->notify)
+    if (!work->notify && work->rsp != NULL)
     {
         lsp_send_rsp(work->rsp);
     }
