@@ -166,8 +166,8 @@ static void _lsp_send_msg(cJSON* msg)
     stdout_req->bufs[0].base = lsp_malloc(header_sz);
 
     stdout_req->bufs[0].len = snprintf(stdout_req->bufs[0].base, header_sz,
-        "Content-Length:%lu\r\n"
-        "Content-Type:application/vscode-jsonrpc; charset=utf-8\r\n\r\n",
+        "Content-Length: %lu\r\n"
+        "Content-Type: application/vscode-jsonrpc; charset=utf-8\r\n\r\n",
         stdout_req->bufs[1].len);
 
     uv_mutex_lock(&s_msg_ctx->msg_queue_mutex);
