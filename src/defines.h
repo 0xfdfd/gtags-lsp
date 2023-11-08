@@ -1,6 +1,10 @@
 #ifndef __TAGS_LSP_DEFINES_H__
 #define __TAGS_LSP_DEFINES_H__
 
+#ifndef TAGS_LSP_PROG_NAME
+#   define TAGS_LSP_PROG_NAME   "tags-lsp"
+#endif
+
 #if defined(__GNUC__) || defined(__clang__)
 #   define container_of(ptr, type, member)   \
         ({ \

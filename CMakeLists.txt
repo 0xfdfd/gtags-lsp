@@ -49,6 +49,10 @@ target_include_directories(${PROJECT_NAME}
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
+target_compile_options(${PROJECT_NAME}
+    PRIVATE
+        -DTAGS_LSP_PROG_NAME="${PROJECT_NAME}")
+
 setup_target_wall(${PROJECT_NAME})
 
 ###############################################################################

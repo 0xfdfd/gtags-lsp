@@ -132,7 +132,7 @@ static void _lsp_method_initialize_generate_rsp(cJSON* rsp)
     /* Information about the server. */
     {
         cJSON* server_info = cJSON_CreateObject();
-        cJSON_AddStringToObject(server_info, "name", "gtags-lsp");
+        cJSON_AddStringToObject(server_info, "name", TAGS_LSP_PROG_NAME);
         cJSON_AddStringToObject(server_info, "version", tag_lsp_version());
         cJSON_AddItemToObject(InitializeResult, "serverInfo", server_info);
     }

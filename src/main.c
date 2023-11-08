@@ -16,8 +16,8 @@
 #endif
 
 static const char* s_help =
-"tags-lsp - Language server protocol wrapper for gtags.\n"
-"Usage: tags-lsp [OPTIONS]\n"
+TAGS_LSP_PROG_NAME " - Language server protocol wrapper for gtags.\n"
+"Usage: " TAGS_LSP_PROG_NAME " [OPTIONS]\n"
 "\n"
 "OPTIONS:\n"
 "  --stdio\n"
@@ -42,11 +42,11 @@ static const char* s_help =
 "    Show this help and exit.\n";
 
 static const char* s_welcome =
-"lsp-tags is a language server that provides IDE-like features to editors.\n"
+TAGS_LSP_PROG_NAME " is a language server that provides IDE-like features to editors.\n"
 "\n"
 "Homepage: https://github.com/0xfdfd/gtags-lsp\n"
 "\n"
-"lsp-tags accepts flags on the commandline. For more information, checkout\n"
+TAGS_LSP_PROG_NAME " accepts flags on the commandline. For more information, checkout\n"
 "command line option `--help`.\n";
 
 static void _cleanup_loop(void)
@@ -160,7 +160,7 @@ static void _on_io_in(const char* data, ssize_t size)
     lsp_parser_execute(g_tags.parser, data, size);
 }
 
-static void _setup_io_or_help(tag_lsp_io_cfg_t* io_cfg, char* argv[])
+static void _parser_command_line_options(tag_lsp_io_cfg_t* io_cfg, char* argv[])
 {
     size_t i;
     int ret = 0;
@@ -238,6 +238,26 @@ static void _on_signal(uv_signal_t* handle, int signum)
     lsp_want_exit();
 }
 
+static void _signal_sigint_init()
+{
+    g_tags.sigint = lsp_malloc(sizeof(uv_signal_t));
+    if (uv_signal_init(g_tags.loop, g_tags.sigint) != 0)
+    {
+        fprintf(stderr, "initialize sigint failed.\n");
+        abort();
+    }
+    uv_signal_start(g_tags.sigint, _on_signal, SIGINT);
+}
+
+static void _show_welecome(void)
+{
+    lsp_direct_log(s_welcome);
+    lsp_direct_log("\n");
+
+    LSP_LOG(LSP_MSG_INFO, "PID: %" PRId64 ", PPID:%" PRId64,
+        (int64_t)uv_os_getpid(), (int64_t)uv_os_getppid());
+}
+
 static char** _initialize(int argc, char* argv[])
 {
     argv = uv_setup_args(argc, argv);
@@ -253,19 +273,17 @@ static char** _initialize(int argc, char* argv[])
         abort();
     }
 
-    g_tags.sigint = lsp_malloc(sizeof(uv_signal_t));
-    if (uv_signal_init(g_tags.loop, g_tags.sigint) != 0)
-    {
-        fprintf(stderr, "initialize sigint failed.\n");
-        abort();
-    }
-    uv_signal_start(g_tags.sigint, _on_signal, SIGINT);
+    /* Initialize sigint handler. */
+    _signal_sigint_init();
 
     tag_lsp_io_cfg_t io_cfg;
-    _setup_io_or_help(&io_cfg, argv);
+    _parser_command_line_options(&io_cfg, argv);
 
     /* Initialize log system. */
     lsp_log_init();
+
+    /* Let's welcome user. */
+    _show_welecome();
 
     /* Initialize IO layer. */
     tag_lsp_io_init(&io_cfg);
@@ -276,14 +294,6 @@ static char** _initialize(int argc, char* argv[])
     g_tags.parser = lsp_parser_create(_handle_request, NULL);
 
     return argv;
-}
-
-static void _show_welecome(void)
-{
-    lsp_direct_log(s_welcome);
-    lsp_direct_log("\n");
-
-    LSP_LOG(LSP_MSG_INFO, "PID: %" PRId64, (int64_t)uv_os_getpid());
 }
 
 int main(int argc, char* argv[])
@@ -297,9 +307,6 @@ int main(int argc, char* argv[])
 
     /* Global initialize. */
     argv = _initialize(argc, argv);
-
-    /* Let's welcome user. */
-    _show_welecome();
 
     //uv_sleep(10 * 1000);
 
