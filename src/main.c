@@ -44,7 +44,7 @@ TAGS_LSP_PROG_NAME " - Language server protocol wrapper for gtags.\n"
 static const char* s_welcome =
 TAGS_LSP_PROG_NAME " is a language server that provides IDE-like features to editors.\n"
 "\n"
-"Homepage: https://github.com/0xfdfd/gtags-lsp\n"
+"Homepage: https://github.com/0xfdfd/tags-lsp\n"
 "\n"
 TAGS_LSP_PROG_NAME " accepts flags on the commandline. For more information, checkout\n"
 "command line option `--help`.\n";
