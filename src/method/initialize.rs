@@ -5,14 +5,39 @@ pub async fn do_initialize(
     let mut rt = backend.rt.lock().await;
     copy_workspace_folder(&mut rt, &params);
 
-    Ok(tower_lsp::lsp_types::InitializeResult {
+    match check_executable_gtags().await {
+        true => (),
+        false => {
+            return Err(tower_lsp::jsonrpc::Error {
+                code: tower_lsp::jsonrpc::ErrorCode::ServerError(
+                    crate::LspErrorCode::RequestFailed.code(),
+                ),
+                message: std::borrow::Cow::Borrowed("gtags: command not found"),
+                data: Option::None,
+            })
+        }
+    }
+
+    return Ok(tower_lsp::lsp_types::InitializeResult {
         server_info: Some(tower_lsp::lsp_types::ServerInfo {
             name: rt.prog_name.clone(),
             version: Some(rt.prog_version.clone()),
         }),
         capabilities: get_server_capacity(),
         ..Default::default()
-    })
+    });
+}
+
+async fn check_executable_gtags() -> bool {
+    let output = tokio::process::Command::new("gtags")
+        .arg("--version")
+        .output();
+    let output = output.await;
+
+    match output {
+        Ok(_) => return true,
+        Err(_) => return false,
+    }
 }
 
 /// Safe workspace folders from client initialize params.
