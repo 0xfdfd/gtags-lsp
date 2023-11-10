@@ -49,13 +49,8 @@ impl tower_lsp::LanguageServer for TagsLspBackend {
         return method::initialize::do_initialize(self, params).await;
     }
 
-    async fn initialized(&self, _: tower_lsp::lsp_types::InitializedParams) {
-        self.client
-            .log_message(
-                tower_lsp::lsp_types::MessageType::INFO,
-                "server initialized!",
-            )
-            .await;
+    async fn initialized(&self, params: tower_lsp::lsp_types::InitializedParams) {
+        return method::initialized::do_initialized(self, params).await;
     }
 
     async fn shutdown(&self) -> tower_lsp::jsonrpc::Result<()> {
