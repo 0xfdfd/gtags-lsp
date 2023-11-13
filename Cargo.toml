@@ -8,3 +8,7 @@ edition = "2021"
 [dependencies]
 tokio = { version = "1.33.0", features = ["full"] }
 tower-lsp = "0.20.0"
+clap = { version = "4.4.8", features = ["default", "std", "color", "derive"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"
+tracing-appender = "0.2"

@@ -22,6 +22,31 @@ impl LspErrorCode {
     }
 }
 
+#[derive(Debug, clap::Parser)]
+#[command(author, version, about, long_about = None)]
+struct TagsLspArgs {
+    #[arg(
+        long,
+        conflicts_with = "port",
+        help = "Uses stdio as the communication channel"
+    )]
+    stdio: bool,
+
+    #[arg(
+        long,
+        conflicts_with = "stdio",
+        help = "Uses a socket as the communication channel"
+    )]
+    port: Option<i32>,
+
+    #[arg(
+        long,
+        value_name = "FILE",
+        help = "Specifies a directory to use for logging"
+    )]
+    log: Option<String>,
+}
+
 #[derive(Debug)]
 struct Runtime {
     /// Program name.
@@ -58,13 +83,34 @@ impl tower_lsp::LanguageServer for TagsLspBackend {
     }
 }
 
+fn setup_command_line_arguments(prog_name: &str) {
+    use clap::Parser;
+    let args = TagsLspArgs::parse();
+
+    // Setup logging system.
+    match args.log {
+        Some(path) => {
+            let file_appender = tracing_appender::rolling::hourly(path, prog_name);
+            let (non_blocking, _) = tracing_appender::non_blocking(file_appender);
+            tracing_subscriber::fmt().with_writer(non_blocking).init();
+        }
+        None => {
+            tracing_subscriber::fmt()
+                .with_writer(std::io::stderr)
+                .init();
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() {
-    let stdin = tokio::io::stdin();
-    let stdout = tokio::io::stdout();
-
     const PROG_NAME: &str = env!("CARGO_PKG_NAME");
     const PROG_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+    setup_command_line_arguments(PROG_NAME);
+
+    let stdin = tokio::io::stdin();
+    let stdout = tokio::io::stdout();
 
     let rt = tokio::sync::Mutex::new(Runtime {
         prog_name: PROG_NAME.to_string(),
