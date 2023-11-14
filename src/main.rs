@@ -107,6 +107,13 @@ impl tower_lsp::LanguageServer for TagsLspBackend {
     ) -> tower_lsp::jsonrpc::Result<Option<Vec<Location>>> {
         return method::references::do_references(self, params).await;
     }
+
+    async fn goto_implementation(
+        &self,
+        params: request::GotoImplementationParams,
+    ) -> tower_lsp::jsonrpc::Result<Option<request::GotoImplementationResponse>> {
+        return method::implementation::goto_implementation(self, params).await;
+    }
 }
 
 fn setup_command_line_arguments(prog_name: &str) -> TagsLspArgs {
