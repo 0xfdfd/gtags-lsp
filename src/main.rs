@@ -134,6 +134,13 @@ impl tower_lsp::LanguageServer for TagsLspBackend {
     ) -> tower_lsp::jsonrpc::Result<Option<Vec<SymbolInformation>>> {
         return method::symbol::do_symbol(self, params).await;
     }
+
+    async fn document_symbol(
+        &self,
+        params: DocumentSymbolParams,
+    ) -> tower_lsp::jsonrpc::Result<Option<DocumentSymbolResponse>> {
+        return method::document_symbol::do_document_symbol(self, params).await;
+    }
 }
 
 fn setup_command_line_arguments(prog_name: &str) -> TagsLspConfig {

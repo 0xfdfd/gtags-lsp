@@ -110,6 +110,7 @@ fn get_server_capacity() -> ServerCapabilities {
                 work_done_progress: Some(true),
             },
         })),
+        document_symbol_provider: Some(OneOf::Left(true)),
         workspace_symbol_provider: Some(OneOf::Right(WorkspaceSymbolOptions {
             work_done_progress_options: WorkDoneProgressOptions {
                 work_done_progress: Some(true),

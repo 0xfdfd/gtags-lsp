@@ -39,11 +39,11 @@ async fn searc_for_definition(
     let lines = crate::method::execute_and_split_lines("global", cwd, &args).await?;
 
     for line in lines {
-        let words: Vec<&str> = line.split_whitespace().collect();
-        let path = crate::method::join_workspace_path(cwd, words[2])?;
-        let line: u32 = words[1].parse().expect("Not a valid u32");
+        let (_, line_no, file_path, _) = crate::method::parse_cxref(&line)?;
+
+        let path = crate::method::join_workspace_path(cwd, &file_path)?;
         let location =
-            crate::method::find_symbol_in_line(&path, line - 1, &symbol, low_precision).await?;
+            crate::method::find_symbol_in_line(&path, line_no - 1, &symbol, low_precision).await?;
 
         loc_list.push(location);
     }

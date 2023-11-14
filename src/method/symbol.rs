@@ -1,4 +1,3 @@
-use regex::Regex;
 use tower_lsp::lsp_types::*;
 
 pub async fn do_symbol(
@@ -33,10 +32,6 @@ pub async fn do_symbol(
     return Ok(None);
 }
 
-lazy_static::lazy_static! {
-    static ref RE_MACRO: Regex = Regex::new(r"#\s*define").unwrap();
-}
-
 async fn do_symbol_sync(
     workspace_folders: &Vec<WorkspaceFolder>,
     query: &String,
@@ -64,7 +59,7 @@ async fn do_symbol_sync(
             )
             .await?;
 
-            let info = create_symbol_information(symbol_name, loc, &rest_string);
+            let info = crate::method::create_symbol_information(symbol_name, loc, &rest_string);
             symbol_list.push(info);
 
             if symbol_list.len() >= RECORD_LIMIT {
@@ -102,7 +97,7 @@ async fn do_symbol_async(
             )
             .await?;
 
-            let info = create_symbol_information(symbol_name, loc, &rest_string);
+            let info = crate::method::create_symbol_information(symbol_name, loc, &rest_string);
             symbol_list.push(info);
 
             if symbol_list.len() >= 16 {
@@ -155,27 +150,4 @@ async fn send_partial_result(
             value: TagsLspProgressParamsValue::Symbol(symbol_list),
         })
         .await;
-}
-
-fn check_symbol_kind(context: &str) -> SymbolKind {
-    match RE_MACRO.find(context) {
-        Some(_) => return SymbolKind::NULL,
-        None => return SymbolKind::FUNCTION,
-    };
-}
-
-#[allow(deprecated)]
-fn create_symbol_information(
-    symbol_name: String,
-    loc: Location,
-    rest_string: &str,
-) -> SymbolInformation {
-    return SymbolInformation {
-        name: symbol_name,
-        kind: check_symbol_kind(&rest_string),
-        tags: None,
-        deprecated: None,
-        location: loc,
-        container_name: None,
-    };
 }

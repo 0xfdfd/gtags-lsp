@@ -1,4 +1,5 @@
 pub mod definition;
+pub mod document_symbol;
 pub mod implementation;
 pub mod initialize;
 pub mod initialized;
@@ -16,6 +17,9 @@ lazy_static::lazy_static! {
 
     /// Pattern for matching symbol.
     static ref RE_SYMBOL: Regex = Regex::new(r"[_0-9a-zA-Z]+").unwrap();
+
+    /// Pattern for matching C macro.
+    static ref RE_MACRO: Regex = Regex::new(r"#\s*define").unwrap();
 }
 
 /// Find workspace folder that contains this file.
@@ -203,7 +207,7 @@ pub async fn execute_and_split_lines(
 ///
 /// ```rust
 /// let cxref = "main              10 src/main.c  main (argc, argv) {";
-/// let (symbol_name, line_number, file_path, rest_string) = parse_cxref(cxref)?;
+/// let (symbol, lineno, path, xref) = parse_cxref(cxref)?;
 /// ```
 pub fn parse_cxref(data: &str) -> Result<(String, u32, String, String), tower_lsp::jsonrpc::Error> {
     let caps = match RE_CXREF.captures(data) {
@@ -276,6 +280,29 @@ pub fn join_workspace_path(cwd: &Url, path: &str) -> Result<Url, tower_lsp::json
     };
 
     return Ok(path);
+}
+
+#[allow(deprecated)]
+pub fn create_symbol_information(
+    symbol_name: String,
+    loc: Location,
+    rest_string: &str,
+) -> SymbolInformation {
+    return SymbolInformation {
+        name: symbol_name,
+        kind: check_symbol_kind(&rest_string),
+        tags: None,
+        deprecated: None,
+        location: loc,
+        container_name: None,
+    };
+}
+
+fn check_symbol_kind(context: &str) -> SymbolKind {
+    match RE_MACRO.find(context) {
+        Some(_) => return SymbolKind::NULL,
+        None => return SymbolKind::FUNCTION,
+    };
 }
 
 /// Read content of file and return it as lines.
