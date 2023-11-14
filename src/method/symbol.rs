@@ -9,10 +9,7 @@ pub async fn do_symbol(
     let low_precision = rt.config.low_precision;
     let workspace_folders = rt.workspace_folders.clone();
 
-    let mut query = params.query.clone();
-    if query == "" {
-        query = String::from(".");
-    }
+    let query = format!(".{}.", params.query);
 
     // Get Partial Result Token
     let partial_result_token = match params.partial_result_params.partial_result_token {
