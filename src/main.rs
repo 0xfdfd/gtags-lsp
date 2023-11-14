@@ -141,6 +141,13 @@ impl tower_lsp::LanguageServer for TagsLspBackend {
     ) -> tower_lsp::jsonrpc::Result<Option<DocumentSymbolResponse>> {
         return method::document_symbol::do_document_symbol(self, params).await;
     }
+
+    async fn goto_type_definition(
+        &self,
+        params: request::GotoTypeDefinitionParams,
+    ) -> tower_lsp::jsonrpc::Result<Option<request::GotoTypeDefinitionResponse>> {
+        return method::type_definition::goto_type_definition(self, params).await;
+    }
 }
 
 fn setup_command_line_arguments(prog_name: &str) -> TagsLspConfig {

@@ -5,6 +5,7 @@ pub mod initialize;
 pub mod initialized;
 pub mod references;
 pub mod symbol;
+pub mod type_definition;
 
 use regex::Regex;
 use tokio::io::AsyncReadExt;
