@@ -1,4 +1,8 @@
+pub mod completion;
 pub mod definition;
+pub mod did_change;
+pub mod did_close;
+pub mod did_open;
 pub mod document_symbol;
 pub mod implementation;
 pub mod initialize;
@@ -52,25 +56,17 @@ pub fn find_belong_workspace_folder(
     });
 }
 
-/// Get symbol from file by position.
-///
-/// # Arguments
-///
-/// + `path`: File path.
-/// + `pos`: Symbol position.
-pub async fn get_symbol_by_position(
-    path: &Url,
+pub fn get_symbol_by_pos_from_dat(
+    data: &String,
     pos: &Position,
 ) -> Result<String, tower_lsp::jsonrpc::Error> {
-    let path = path.path();
     let line_no = pos.line as usize;
     let column_no = pos.character as usize;
 
-    let lines = get_file_as_lines(path).await?;
+    let lines = split_string_by_lines(data);
     let line = &lines[line_no];
 
     let mut word = String::new();
-
     for mat in RE_SYMBOL.find_iter(line.as_str()) {
         if mat.start() <= column_no && mat.end() >= column_no {
             word = mat.as_str().to_string();
@@ -89,6 +85,20 @@ pub async fn get_symbol_by_position(
     }
 
     return Ok(word);
+}
+
+/// Get symbol from file by position.
+///
+/// # Arguments
+///
+/// + `path`: File path.
+/// + `pos`: Symbol position.
+pub async fn get_symbol_by_position(
+    path: &Url,
+    pos: &Position,
+) -> Result<String, tower_lsp::jsonrpc::Error> {
+    let content = read_file_content(path.path()).await?;
+    return get_symbol_by_pos_from_dat(&content, pos);
 }
 
 /// Find symbol in specific file line.
@@ -306,12 +316,7 @@ fn check_symbol_kind(context: &str) -> SymbolKind {
     };
 }
 
-/// Read content of file and return it as lines.
-///
-/// # Arguments
-///
-/// + `path`: File path.
-async fn get_file_as_lines(path: &str) -> Result<Vec<String>, tower_lsp::jsonrpc::Error> {
+async fn read_file_content(path: &str) -> Result<String, tower_lsp::jsonrpc::Error> {
     // Open file.
     let mut file = match tokio::fs::File::open(path).await {
         Ok(v) => v,
@@ -345,6 +350,16 @@ async fn get_file_as_lines(path: &str) -> Result<Vec<String>, tower_lsp::jsonrpc
         }
     }
 
+    return Ok(content);
+}
+
+/// Read content of file and return it as lines.
+///
+/// # Arguments
+///
+/// + `path`: File path.
+async fn get_file_as_lines(path: &str) -> Result<Vec<String>, tower_lsp::jsonrpc::Error> {
+    let content = read_file_content(path).await?;
     return Ok(split_string_by_lines(&content));
 }
 

@@ -1,5 +1,6 @@
 mod method;
 
+use std::collections::HashMap;
 use tower_lsp::{lsp_types::*, ClientSocket, LspService};
 
 /// LSP error code that [`tower_lsp::jsonrpc::ErrorCode`] not defined.
@@ -82,6 +83,9 @@ struct Runtime {
 
     /// Workspace folder list.
     workspace_folders: Vec<WorkspaceFolder>,
+
+    /// Opened files.
+    open_files: HashMap<Url, String>,
 }
 
 #[derive(Debug)]
@@ -147,6 +151,25 @@ impl tower_lsp::LanguageServer for TagsLspBackend {
         params: request::GotoTypeDefinitionParams,
     ) -> tower_lsp::jsonrpc::Result<Option<request::GotoTypeDefinitionResponse>> {
         return method::type_definition::goto_type_definition(self, params).await;
+    }
+
+    async fn did_open(&self, params: DidOpenTextDocumentParams) {
+        return method::did_open::did_open(self, params).await;
+    }
+
+    async fn did_close(&self, params: DidCloseTextDocumentParams) {
+        return method::did_close::did_close(self, params).await;
+    }
+
+    async fn did_change(&self, params: DidChangeTextDocumentParams) {
+        return method::did_change::did_change(self, params).await;
+    }
+
+    async fn completion(
+        &self,
+        params: CompletionParams,
+    ) -> tower_lsp::jsonrpc::Result<Option<CompletionResponse>> {
+        return method::completion::do_completion(self, params).await;
     }
 }
 
@@ -238,6 +261,7 @@ async fn main() {
         prog_version: PROG_VERSION.to_string(),
         workspace_folders: Vec::new(),
         config: config.clone(),
+        open_files: HashMap::new(),
     });
 
     let (service, socket) = tower_lsp::LspService::new(|client| TagsLspBackend { client, rt });

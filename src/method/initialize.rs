@@ -98,6 +98,9 @@ fn get_server_capacity() -> ServerCapabilities {
     return ServerCapabilities {
         position_encoding: Some(PositionEncodingKind::UTF8),
         text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)),
+        completion_provider: Some(CompletionOptions {
+            ..Default::default()
+        }),
         definition_provider: Some(OneOf::Right(DefinitionOptions {
             work_done_progress_options: WorkDoneProgressOptions {
                 work_done_progress: Some(true),
