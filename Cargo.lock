@@ -755,6 +755,7 @@ name = "tags-lsp"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "lazy_static",
  "regex",
  "serde_json",
  "tokio",

@@ -3,8 +3,18 @@ pub mod initialize;
 pub mod initialized;
 pub mod references;
 
+use regex::Regex;
 use tokio::io::AsyncReadExt;
 use tower_lsp::lsp_types::*;
+
+lazy_static::lazy_static! {
+
+    /// Pattern for match `cxref` string.
+    static ref RE_CXREF: Regex = Regex::new(r"([^\s]+)\s+(\d+)\s+([^\s]+)\s+([^\s].*)").unwrap();
+
+    /// Pattern for matching symbol.
+    static ref RE_SYMBOL: Regex = Regex::new(r"[_0-9a-zA-Z]+").unwrap();
+}
 
 /// Find workspace folder that contains this file.
 ///
@@ -52,23 +62,9 @@ pub async fn get_symbol_by_position(
     let lines = get_file_as_lines(path).await?;
     let line = &lines[line_no];
 
-    let re = match regex::Regex::new("[_0-9a-zA-Z]+") {
-        Ok(v) => v,
-        Err(e) => {
-            return Err(tower_lsp::jsonrpc::Error {
-                code: tower_lsp::jsonrpc::ErrorCode::ServerError(
-                    crate::LspErrorCode::RequestFailed.code(),
-                ),
-                message: std::borrow::Cow::Borrowed("Compile regex failed"),
-                data: Some(serde_json::json!({
-                    "error": e.to_string(),
-                })),
-            })
-        }
-    };
     let mut word = String::new();
 
-    for mat in re.find_iter(line.as_str()) {
+    for mat in RE_SYMBOL.find_iter(line.as_str()) {
         if mat.start() <= column_no && mat.end() >= column_no {
             word = mat.as_str().to_string();
             break;
@@ -198,23 +194,7 @@ pub async fn execute_and_split_lines(
 /// let (symbol_name, line_number, file_path, rest_string) = parse_cxref(cxref)?;
 /// ```
 pub fn parse_cxref(data: &str) -> Result<(String, u32, String, String), tower_lsp::jsonrpc::Error> {
-    let re = match regex::Regex::new(r"([^\s]+)\s+(\d+)\s+([^\s]+)\s+([^\s].*)") {
-        Ok(v) => v,
-        Err(e) => {
-            tracing::error!("Compile regex failed.");
-            return Err(tower_lsp::jsonrpc::Error {
-                code: tower_lsp::jsonrpc::ErrorCode::ServerError(
-                    crate::LspErrorCode::RequestFailed.code(),
-                ),
-                message: std::borrow::Cow::Borrowed("Compile regex failed"),
-                data: Some(serde_json::json!({
-                    "error": e.to_string(),
-                })),
-            });
-        }
-    };
-
-    let caps = match re.captures(data) {
+    let caps = match RE_CXREF.captures(data) {
         Some(v) => v,
         None => {
             tracing::error!("Capture group failed. cxref:{}", data);
