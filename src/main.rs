@@ -24,9 +24,9 @@ impl LspErrorCode {
     }
 }
 
-#[derive(Debug, clap::Parser)]
+#[derive(Debug, clap::Parser, Default, Clone)]
 #[command(author, version, about, long_about = None)]
-struct TagsLspArgs {
+struct TagsLspConfig {
     #[arg(
         long,
         conflicts_with = "port",
@@ -52,20 +52,33 @@ struct TagsLspArgs {
     #[arg(
         long,
         value_name = "STRING",
-        help = "Set log leve.",
+        help = "Set log leve",
         long_help = "Possible values are: [OFF | TRACE | DEBUG | INFO | WARN | ERROR]. By default
 `INFO` is used. Case insensitive."
     )]
     loglevel: Option<String>,
+
+    #[arg(
+        long,
+        help = "Enable `low_precision` mode",
+        long_help = "By default symbols are matched accurately, so when LSP client jump to the symbol
+place, the cursor will surround the symbol. However that behaviour is very
+costly. Enable `low_precision` mode makes the matching result point to the
+begin of line, which should not affect experience very much."
+    )]
+    low_precision: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default, Clone)]
 struct Runtime {
     /// Program name.
     prog_name: String,
 
     /// Program version.
     prog_version: String,
+
+    /// Configuration.
+    config: TagsLspConfig,
 
     /// Workspace folder list.
     workspace_folders: Vec<WorkspaceFolder>,
@@ -123,9 +136,9 @@ impl tower_lsp::LanguageServer for TagsLspBackend {
     }
 }
 
-fn setup_command_line_arguments(prog_name: &str) -> TagsLspArgs {
+fn setup_command_line_arguments(prog_name: &str) -> TagsLspConfig {
     use clap::Parser;
-    let args: TagsLspArgs = TagsLspArgs::parse();
+    let args = TagsLspConfig::parse();
 
     // Get log level.
     let loglevel = match &args.loglevel {
@@ -203,18 +216,19 @@ async fn main() {
     const PROG_NAME: &str = env!("CARGO_PKG_NAME");
     const PROG_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-    let args = setup_command_line_arguments(PROG_NAME);
+    let config = setup_command_line_arguments(PROG_NAME);
     show_welcome(PROG_NAME, PROG_VERSION);
 
     let rt = tokio::sync::Mutex::new(Runtime {
         prog_name: PROG_NAME.to_string(),
         prog_version: PROG_VERSION.to_string(),
         workspace_folders: Vec::new(),
+        config: config.clone(),
     });
 
     let (service, socket) = tower_lsp::LspService::new(|client| TagsLspBackend { client, rt });
 
-    match args.port {
+    match config.port {
         Some(port) => {
             start_lsp_using_socket(service, socket, port).await;
         }

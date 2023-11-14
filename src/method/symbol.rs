@@ -6,6 +6,7 @@ pub async fn do_symbol(
     params: WorkspaceSymbolParams,
 ) -> tower_lsp::jsonrpc::Result<Option<Vec<SymbolInformation>>> {
     let rt = backend.rt.lock().await;
+    let low_precision = rt.config.low_precision;
     let workspace_folders = rt.workspace_folders.clone();
 
     let mut query = params.query.clone();
@@ -16,13 +17,20 @@ pub async fn do_symbol(
     // Get Partial Result Token
     let partial_result_token = match params.partial_result_params.partial_result_token {
         Some(v) => v,
-        None => return do_symbol_sync(&workspace_folders, &query).await,
+        None => return do_symbol_sync(&workspace_folders, &query, low_precision).await,
     };
 
     // Partial Result Progress
     let client = backend.client.clone();
     tokio::task::spawn(async move {
-        let _ = do_symbol_async(client, &workspace_folders, &query, &partial_result_token).await;
+        let _ = do_symbol_async(
+            client,
+            &workspace_folders,
+            &query,
+            &partial_result_token,
+            low_precision,
+        )
+        .await;
     });
 
     return Ok(None);
@@ -35,8 +43,12 @@ lazy_static::lazy_static! {
 async fn do_symbol_sync(
     workspace_folders: &Vec<WorkspaceFolder>,
     query: &String,
+    low_precision: bool,
 ) -> tower_lsp::jsonrpc::Result<Option<Vec<SymbolInformation>>> {
     let mut symbol_list = Vec::<SymbolInformation>::new();
+
+    // No need to return too much of symbols.
+    const RECORD_LIMIT: usize = 99;
 
     for ele in workspace_folders {
         let cwd = &ele.uri;
@@ -47,11 +59,20 @@ async fn do_symbol_sync(
             let (symbol_name, line_number, file_path, rest_string) =
                 crate::method::parse_cxref(&line)?;
             let file_path = crate::method::join_workspace_path(cwd, &file_path)?;
-            let loc = crate::method::find_symbol_in_line(&file_path, line_number - 1, &symbol_name)
-                .await?;
+            let loc = crate::method::find_symbol_in_line(
+                &file_path,
+                line_number - 1,
+                &symbol_name,
+                low_precision,
+            )
+            .await?;
 
             let info = create_symbol_information(symbol_name, loc, &rest_string);
             symbol_list.push(info);
+
+            if symbol_list.len() >= RECORD_LIMIT {
+                break;
+            }
         }
     }
 
@@ -63,6 +84,7 @@ async fn do_symbol_async(
     workspace_folders: &Vec<WorkspaceFolder>,
     query: &String,
     partial_result_token: &NumberOrString,
+    low_precision: bool,
 ) -> Result<(), tower_lsp::jsonrpc::Error> {
     let mut symbol_list = Vec::<SymbolInformation>::new();
 
@@ -75,8 +97,13 @@ async fn do_symbol_async(
             let (symbol_name, line_number, file_path, rest_string) =
                 crate::method::parse_cxref(&line)?;
             let file_path = crate::method::join_workspace_path(cwd, &file_path)?;
-            let loc = crate::method::find_symbol_in_line(&file_path, line_number - 1, &symbol_name)
-                .await?;
+            let loc = crate::method::find_symbol_in_line(
+                &file_path,
+                line_number - 1,
+                &symbol_name,
+                low_precision,
+            )
+            .await?;
 
             let info = create_symbol_information(symbol_name, loc, &rest_string);
             symbol_list.push(info);

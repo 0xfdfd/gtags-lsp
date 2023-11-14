@@ -93,12 +93,21 @@ pub async fn get_symbol_by_position(
 /// + `path`: File path.
 /// + `line_no`: Line number, starting from 0.
 /// + `symbol`: The symbol to find.
+/// + `low_precision`: Do not find precise position, just point to begin of line.
 pub async fn find_symbol_in_line(
     path: &Url,
     line_no: u32,
     symbol: &str,
+    low_precision: bool,
 ) -> Result<Location, tower_lsp::jsonrpc::Error> {
     let line_no = line_no as usize;
+
+    if low_precision {
+        let start = Position::new(line_no as u32, 0);
+        let end = Position::new(line_no as u32, 0);
+        let range = Range::new(start, end);
+        return Ok(Location::new(path.clone(), range));
+    }
 
     let lines = match get_file_as_lines(path.path()).await {
         Ok(v) => v,

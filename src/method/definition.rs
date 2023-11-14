@@ -5,12 +5,13 @@ pub async fn goto_definition(
     params: GotoDefinitionParams,
 ) -> tower_lsp::jsonrpc::Result<Option<GotoDefinitionResponse>> {
     let rt = backend.rt.lock().await;
+    let low_precision = rt.config.low_precision;
 
     let file_uri = &params.text_document_position_params.text_document.uri;
     let file_position = &params.text_document_position_params.position;
     let cwd = crate::method::find_belong_workspace_folder(&rt.workspace_folders, file_uri)?;
 
-    let loc_list = searc_for_definition(&cwd.uri, file_uri, file_position).await?;
+    let loc_list = searc_for_definition(&cwd.uri, file_uri, file_position, low_precision).await?;
     return Ok(Some(GotoDefinitionResponse::Array(loc_list)));
 }
 
@@ -25,6 +26,7 @@ async fn searc_for_definition(
     cwd: &Url,
     file: &Url,
     pos: &Position,
+    low_precision: bool,
 ) -> Result<Vec<Location>, tower_lsp::jsonrpc::Error> {
     // Location list for return.
     let mut loc_list = Vec::new();
@@ -40,7 +42,8 @@ async fn searc_for_definition(
         let words: Vec<&str> = line.split_whitespace().collect();
         let path = crate::method::join_workspace_path(cwd, words[2])?;
         let line: u32 = words[1].parse().expect("Not a valid u32");
-        let location = crate::method::find_symbol_in_line(&path, line - 1, &symbol).await?;
+        let location =
+            crate::method::find_symbol_in_line(&path, line - 1, &symbol, low_precision).await?;
 
         loc_list.push(location);
     }
