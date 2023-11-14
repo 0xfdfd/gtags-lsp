@@ -1,6 +1,6 @@
 mod method;
 
-use tower_lsp::lsp_types::*;
+use tower_lsp::{lsp_types::*, ClientSocket, LspService};
 
 /// LSP error code that [`tower_lsp::jsonrpc::ErrorCode`] not defined.
 pub enum LspErrorCode {
@@ -37,9 +37,10 @@ struct TagsLspArgs {
     #[arg(
         long,
         conflicts_with = "stdio",
-        help = "Uses a socket as the communication channel"
+        help = "Uses a socket as the communication channel",
+        long_help = "The LSP server start as TCP client and connect to the specified port."
     )]
-    port: Option<i32>,
+    port: Option<u16>,
 
     #[arg(
         long,
@@ -101,13 +102,13 @@ impl tower_lsp::LanguageServer for TagsLspBackend {
     }
 }
 
-fn setup_command_line_arguments(prog_name: &str) {
+fn setup_command_line_arguments(prog_name: &str) -> TagsLspArgs {
     use clap::Parser;
     let args: TagsLspArgs = TagsLspArgs::parse();
 
     // Get log level.
-    let loglevel = match args.loglevel {
-        Some(v) => v,
+    let loglevel = match &args.loglevel {
+        Some(v) => v.clone(),
         None => String::from("INFO"),
     };
 
@@ -126,7 +127,7 @@ fn setup_command_line_arguments(prog_name: &str) {
     };
 
     // Setup logging system.
-    match args.logdir {
+    match &args.logdir {
         Some(path) => {
             let logfile = format!("{}.log", prog_name);
             let file_appender = tracing_appender::rolling::never(path, logfile);
@@ -143,6 +144,8 @@ fn setup_command_line_arguments(prog_name: &str) {
                 .init();
         }
     }
+
+    return args;
 }
 
 fn show_welcome(prog_name: &str, prog_version: &str) {
@@ -150,16 +153,37 @@ fn show_welcome(prog_name: &str, prog_version: &str) {
     tracing::info!("PID: {}", std::process::id());
 }
 
+async fn start_lsp_using_stdio(service: LspService<TagsLspBackend>, socket: ClientSocket) {
+    let stdin = tokio::io::stdin();
+    let stdout = tokio::io::stdout();
+
+    tower_lsp::Server::new(stdin, stdout, socket)
+        .serve(service)
+        .await;
+}
+
+async fn start_lsp_using_socket(
+    service: LspService<TagsLspBackend>,
+    socket: ClientSocket,
+    port: u16,
+) {
+    let addr = format!("127.0.0.1:{}", port);
+    let mut stream = match tokio::net::TcpStream::connect(addr).await {
+        Ok(v) => v,
+        Err(e) => panic!("Cannot connect to port `{}`: {}", port, e.to_string()),
+    };
+
+    let (r, w) = stream.split();
+    tower_lsp::Server::new(r, w, socket).serve(service).await;
+}
+
 #[tokio::main]
 async fn main() {
     const PROG_NAME: &str = env!("CARGO_PKG_NAME");
     const PROG_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-    setup_command_line_arguments(PROG_NAME);
+    let args = setup_command_line_arguments(PROG_NAME);
     show_welcome(PROG_NAME, PROG_VERSION);
-
-    let stdin = tokio::io::stdin();
-    let stdout = tokio::io::stdout();
 
     let rt = tokio::sync::Mutex::new(Runtime {
         prog_name: PROG_NAME.to_string(),
@@ -169,7 +193,12 @@ async fn main() {
 
     let (service, socket) = tower_lsp::LspService::new(|client| TagsLspBackend { client, rt });
 
-    tower_lsp::Server::new(stdin, stdout, socket)
-        .serve(service)
-        .await;
+    match args.port {
+        Some(port) => {
+            start_lsp_using_socket(service, socket, port).await;
+        }
+        None => {
+            start_lsp_using_stdio(service, socket).await;
+        }
+    }
 }
