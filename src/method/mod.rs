@@ -3,6 +3,7 @@ pub mod implementation;
 pub mod initialize;
 pub mod initialized;
 pub mod references;
+pub mod symbol;
 
 use regex::Regex;
 use tokio::io::AsyncReadExt;
@@ -135,9 +136,10 @@ pub async fn find_symbol_in_line(
 /// + `args`: Arguments list.
 pub async fn execute_and_split_lines(
     program: &str,
-    cwd: &str,
+    cwd: &Url,
     args: &Vec<&str>,
 ) -> Result<Vec<String>, tower_lsp::jsonrpc::Error> {
+    let cwd = cwd.path();
     let output = tokio::process::Command::new(program)
         .current_dir(cwd)
         .args(args)
@@ -237,6 +239,34 @@ pub fn parse_cxref(data: &str) -> Result<(String, u32, String, String), tower_ls
         caps[3].to_string(),
         caps[4].to_string(),
     ));
+}
+
+/// Join workspace folder Url and file path.
+///
+/// # Arguments
+///
+/// + `cwd`: Workspace folder Url,
+/// + `path`: File path in that folder.
+pub fn join_workspace_path(cwd: &Url, path: &str) -> Result<Url, tower_lsp::jsonrpc::Error> {
+    let path = format!("{}/{}", cwd.path(), path);
+
+    let path = match Url::from_file_path(&path) {
+        Ok(v) => v,
+        Err(_) => {
+            return Err(tower_lsp::jsonrpc::Error {
+                code: tower_lsp::jsonrpc::ErrorCode::ServerError(
+                    crate::LspErrorCode::RequestFailed.code(),
+                ),
+                message: std::borrow::Cow::Borrowed("Path is not absolute"),
+                data: Some(serde_json::json! ({
+                    "cwd": cwd.path(),
+                    "path": path,
+                })),
+            })
+        }
+    };
+
+    return Ok(path);
 }
 
 /// Read content of file and return it as lines.

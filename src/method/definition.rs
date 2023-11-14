@@ -26,8 +26,6 @@ async fn searc_for_definition(
     file: &Url,
     pos: &Position,
 ) -> Result<Vec<Location>, tower_lsp::jsonrpc::Error> {
-    // Get file path.
-    let cwd_path = cwd.path();
     // Location list for return.
     let mut loc_list = Vec::new();
 
@@ -36,28 +34,11 @@ async fn searc_for_definition(
 
     // Execute command.
     let args = vec!["-d", "-x", symbol.as_str()];
-    let lines = crate::method::execute_and_split_lines("global", cwd_path, &args).await?;
+    let lines = crate::method::execute_and_split_lines("global", cwd, &args).await?;
 
     for line in lines {
         let words: Vec<&str> = line.split_whitespace().collect();
-        let path = words[2];
-        let path = format!("{}/{}", cwd.path(), path);
-
-        let path = match Url::from_file_path(&path) {
-            Ok(v) => v,
-            Err(_) => {
-                return Err(tower_lsp::jsonrpc::Error {
-                    code: tower_lsp::jsonrpc::ErrorCode::ServerError(
-                        crate::LspErrorCode::RequestFailed.code(),
-                    ),
-                    message: std::borrow::Cow::Borrowed("Path is not absolute"),
-                    data: Some(serde_json::json! ({
-                        "error": path,
-                    })),
-                })
-            }
-        };
-
+        let path = crate::method::join_workspace_path(cwd, words[2])?;
         let line: u32 = words[1].parse().expect("Not a valid u32");
         let location = crate::method::find_symbol_in_line(&path, line - 1, &symbol).await?;
 

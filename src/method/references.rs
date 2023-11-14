@@ -33,25 +33,11 @@ async fn search_for_references(
     let symbol = crate::method::get_symbol_by_position(file, pos).await?;
 
     let args = vec!["-r", "-s", "-x", symbol.as_str()];
-    let lines = crate::method::execute_and_split_lines("global", cwd.path(), &args).await?;
+    let lines = crate::method::execute_and_split_lines("global", cwd, &args).await?;
 
     for line in lines {
         let (_, line_number, file_path, _) = crate::method::parse_cxref(&line)?;
-        let file_path = format!("{}/{}", cwd.path(), file_path);
-        let file_path = match Url::from_file_path(&file_path) {
-            Ok(v) => v,
-            Err(_) => {
-                return Err(tower_lsp::jsonrpc::Error {
-                    code: tower_lsp::jsonrpc::ErrorCode::ServerError(
-                        crate::LspErrorCode::RequestFailed.code(),
-                    ),
-                    message: std::borrow::Cow::Borrowed("Path is not absolute"),
-                    data: Some(serde_json::json! ({
-                        "error": file_path,
-                    })),
-                })
-            }
-        };
+        let file_path = crate::method::join_workspace_path(cwd, &file_path)?;
 
         let location =
             crate::method::find_symbol_in_line(&file_path, line_number - 1, &symbol).await?;
