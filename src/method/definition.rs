@@ -27,13 +27,12 @@ async fn searc_for_definition(
     pos: &Position,
 ) -> Result<Vec<Location>, tower_lsp::jsonrpc::Error> {
     // Get file path.
-    let path = file.path();
     let cwd_path = cwd.path();
     // Location list for return.
     let mut loc_list = Vec::new();
 
     // Get symbol from position.
-    let symbol = crate::method::get_symbol_by_position(path, pos).await?;
+    let symbol = crate::method::get_symbol_by_position(file, pos).await?;
 
     // Execute command.
     let args = vec!["-d", "-x", symbol.as_str()];

@@ -100,6 +100,13 @@ impl tower_lsp::LanguageServer for TagsLspBackend {
     ) -> tower_lsp::jsonrpc::Result<Option<GotoDefinitionResponse>> {
         return method::definition::goto_definition(self, params).await;
     }
+
+    async fn references(
+        &self,
+        params: ReferenceParams,
+    ) -> tower_lsp::jsonrpc::Result<Option<Vec<Location>>> {
+        return method::references::do_references(self, params).await;
+    }
 }
 
 fn setup_command_line_arguments(prog_name: &str) -> TagsLspArgs {

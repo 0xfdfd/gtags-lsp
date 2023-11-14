@@ -1,6 +1,7 @@
 pub mod definition;
 pub mod initialize;
 pub mod initialized;
+pub mod references;
 
 use tokio::io::AsyncReadExt;
 use tower_lsp::lsp_types::*;
@@ -41,9 +42,10 @@ pub fn find_belong_workspace_folder(
 /// + `path`: File path.
 /// + `pos`: Symbol position.
 pub async fn get_symbol_by_position(
-    path: &str,
+    path: &Url,
     pos: &Position,
 ) -> Result<String, tower_lsp::jsonrpc::Error> {
+    let path = path.path();
     let line_no = pos.line as usize;
     let column_no = pos.character as usize;
 
@@ -175,6 +177,85 @@ pub async fn execute_and_split_lines(
     };
 
     return Ok(split_string_by_lines(&content));
+}
+
+/// Parser cxref string.
+///
+/// A `cxref` string looks like:
+///
+/// ```txt
+/// main              10 src/main.c  main (argc, argv) {
+/// ```
+///
+/// # Arguments
+///
+/// + `data`: The `cxref` string to parse.
+///
+/// # Examples
+///
+/// ```rust
+/// let cxref = "main              10 src/main.c  main (argc, argv) {";
+/// let (symbol_name, line_number, file_path, rest_string) = parse_cxref(cxref)?;
+/// ```
+pub fn parse_cxref(data: &str) -> Result<(String, u32, String, String), tower_lsp::jsonrpc::Error> {
+    let re = match regex::Regex::new(r"([^\s]+)\s+(\d+)\s+([^\s]+)\s+([^\s].*)") {
+        Ok(v) => v,
+        Err(e) => {
+            tracing::error!("Compile regex failed.");
+            return Err(tower_lsp::jsonrpc::Error {
+                code: tower_lsp::jsonrpc::ErrorCode::ServerError(
+                    crate::LspErrorCode::RequestFailed.code(),
+                ),
+                message: std::borrow::Cow::Borrowed("Compile regex failed"),
+                data: Some(serde_json::json!({
+                    "error": e.to_string(),
+                })),
+            });
+        }
+    };
+
+    let caps = match re.captures(data) {
+        Some(v) => v,
+        None => {
+            tracing::error!("Capture group failed. cxref:{}", data);
+            return Err(tower_lsp::jsonrpc::Error {
+                code: tower_lsp::jsonrpc::ErrorCode::ServerError(
+                    crate::LspErrorCode::RequestFailed.code(),
+                ),
+                message: std::borrow::Cow::Borrowed("Capture group failed"),
+                data: None,
+            });
+        }
+    };
+
+    let line_number: u32 = match caps[2].parse() {
+        Ok(v) => v,
+        Err(e) => {
+            tracing::error!(
+                "Not a valid u32. caps[1]:{}, caps[2]:{}, caps[3]:{}, caps[4]:{}",
+                caps[1].to_string(),
+                caps[2].to_string(),
+                caps[3].to_string(),
+                caps[4].to_string()
+            );
+            return Err(tower_lsp::jsonrpc::Error {
+                code: tower_lsp::jsonrpc::ErrorCode::ServerError(
+                    crate::LspErrorCode::RequestFailed.code(),
+                ),
+                message: std::borrow::Cow::Borrowed("Not a valid u32"),
+                data: Some(serde_json::json!({
+                    "error": e.to_string(),
+                })),
+            });
+        }
+    };
+
+    return Ok((
+        caps[1].to_string(),
+        line_number,
+        caps[3].to_string(),
+        caps[4].to_string(),
+    ));
 }
 
 /// Read content of file and return it as lines.
